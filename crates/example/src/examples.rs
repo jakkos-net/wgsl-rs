@@ -42,6 +42,7 @@ pub const EXAMPLE_MODULES: &[&wgsl_rs::Source] = &[
     &hello_triangle_generic::WGSL_SOURCE,
     &phantom_data::WGSL_SOURCE,
     &swizzles::WGSL_SOURCE,
+    &builtin_constants::WGSL_SOURCE,
 ];
 
 pub fn get_module_by_name(name: &str) -> Option<&'static wgsl_rs::Source> {
@@ -1959,5 +1960,24 @@ pub mod swizzles {
         // let _b3: Vec3b = _b2.zzz();
         // let _b4: Vec3b = _b3.rgb();
         // let _b5: Vec4b = _b4.bbbb();
+    }
+}
+
+#[wgsl]
+pub mod builtin_constants {
+    use wgsl_rs::std::*;
+
+    pub fn demo_constants() {
+        // square matrices have `IDENTITY` and `ZERO`
+        let _m0 = Mat4x4f::IDENTITY * Mat4x4f::ZERO;
+        // non-square only have `ZERO`
+        let _m1 = Mat4x3f::ZERO;
+
+        // vectors have `ONE`, `ZERO`, and `X`, `Y`, `Z`, `W` (where appropriate)
+        let _v0 = Vec4f::X + Vec4f::ONE;
+        let _v1 = Vec3u::ZERO;
+        let _v2 = Vec2i::Y - Vec2i::X;
+        // signed vectors also have `NEG_ONE`
+        let _v3 = Vec3i::NEG_ONE;
     }
 }
