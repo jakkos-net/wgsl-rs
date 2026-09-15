@@ -1958,6 +1958,6 @@ pub mod swizzles {
         // let _b2: Vec4b = _b1.xxyy();
         // let _b3: Vec3b = _b2.zzz();
         // let _b4: Vec3b = _b3.rgb();
-        // let _b5: Vec4f = _b4.bbbb();
+        // let _b5: Vec4b = _b4.bbbb();
     }
 }
