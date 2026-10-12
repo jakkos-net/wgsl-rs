@@ -2383,10 +2383,12 @@ fn enum_variant_consts_anchor_literals() {
                 EnumVariant {
                     name: "On".to_string(),
                     discriminant: None,
+                    attrs: vec![],
                 },
                 EnumVariant {
                     name: "Off".to_string(),
                     discriminant: None,
+                    attrs: vec![],
                 },
             ],
             attrs: vec![],

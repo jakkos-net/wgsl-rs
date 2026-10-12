@@ -1,10 +1,15 @@
 //! Conversion from `parse::*` (compile-time, `syn`-based AST) to `ir::*`
 //! (owned, `String`/`Vec<T>`-based runtime IR).
 //!
-//! The conversion is intentionally mechanical: it strips `syn` tokens and
-//! spans, converts identifiers to `String`, and parses literal integers
-//! into Rust numeric types. It does *not* perform any WGSL-specific
-//! transformations (those live in `wgsl-rs-ir/src/render.rs`).
+//! The conversion is mechanical: it strips `syn` tokens and spans,
+//! converts identifiers to `String`, and parses literal integers into
+//! Rust numeric types. It performs no WGSL-specific transformations on
+//! the items it converts (those live in `wgsl-rs-ir/src/render.rs`) —
+//! with one deliberate synthesis exception: an enum carrying
+//! `#[default]` gets a synthesized inherent `default()` method appended
+//! alongside it (see `enum_default_impl`). Synthesis lives here rather
+//! than in a separate pass because it must happen before rendering,
+//! which stays a pure emitter; see DEVLOG 2026-10-12.
 
 use proc_macro2::Span;
 use snafu::prelude::*;
@@ -35,12 +40,153 @@ type Result<T> = std::result::Result<T, ConvertError>;
 
 // ===== Top-level helpers =====
 
+/// A WGSL global name declared by a parse item, for collision checks
+/// against synthesized names.
+struct GlobalName {
+    name: String,
+    /// What the name is, for error messages (e.g. "a free function").
+    kind: &'static str,
+}
+
+/// Collect the WGSL global names a module's parse items declare: free
+/// functions and structs (non-generic, mirroring monomorphize's reserved
+/// set), consts, module variables, enum aliases and variant constants,
+/// and the mangled names of non-generic simple-struct impl methods.
+///
+/// Generic functions and structs are skipped — their instantiated names
+/// carry type suffixes and are checked against this set at
+/// instantiation time; synthesized names are always concrete.
+fn wgsl_global_names(items: &[parse::Item]) -> Vec<GlobalName> {
+    let mut out = vec![];
+    for item in items {
+        match item {
+            parse::Item::Fn(f) => {
+                // Mirror monomorphize's classification: true templates
+                // are instantiated with type-suffixed names, but plain
+                // functions AND generic entry points keep their
+                // original names in the WGSL source.
+                let is_generic_entry_point = (!f.type_params.is_empty()
+                    || !f.const_params.is_empty())
+                    && !matches!(f.fn_attrs, parse::FnAttrs::None);
+                let is_template = (!f.type_params.is_empty() || !f.const_params.is_empty())
+                    && !is_generic_entry_point;
+                if !is_template {
+                    out.push(GlobalName {
+                        name: f.ident.to_string(),
+                        kind: "a free function",
+                    });
+                }
+            }
+            parse::Item::Const(c) => out.push(GlobalName {
+                name: c.ident.to_string(),
+                kind: "a const",
+            }),
+            parse::Item::Uniform(u) => out.push(GlobalName {
+                name: u.name.to_string(),
+                kind: "a module variable",
+            }),
+            parse::Item::Storage(s) => out.push(GlobalName {
+                name: s.name.to_string(),
+                kind: "a module variable",
+            }),
+            parse::Item::Workgroup(w) => out.push(GlobalName {
+                name: w.name.to_string(),
+                kind: "a module variable",
+            }),
+            parse::Item::Sampler(s) => out.push(GlobalName {
+                name: s.name.to_string(),
+                kind: "a module variable",
+            }),
+            parse::Item::Texture(t) => out.push(GlobalName {
+                name: t.name.to_string(),
+                kind: "a module variable",
+            }),
+            parse::Item::Struct(s) if s.type_params.is_empty() && s.const_params.is_empty() => {
+                out.push(GlobalName {
+                    name: s.ident.to_string(),
+                    kind: "a struct",
+                });
+            }
+            parse::Item::Enum(e) => {
+                out.push(GlobalName {
+                    name: e.ident.to_string(),
+                    kind: "an enum alias",
+                });
+                for v in &e.variants {
+                    out.push(GlobalName {
+                        name: ir::mangle(&[&e.ident.to_string(), &v.ident.to_string()]),
+                        kind: "an enum variant constant",
+                    });
+                }
+            }
+            parse::Item::Impl(i) if i.type_params.is_empty() && i.const_params.is_empty() => {
+                // Every impl member — method, const, and type alias —
+                // flattens into the same global namespace, prefixed by
+                // the same self-type mangling the conversion itself
+                // uses. Complex self types (arrays, etc.) are covered;
+                // a mangling failure is skipped here and surfaces from
+                // the item's own conversion.
+                if let Ok(prefix) = crate::monomorphize::mangle_type(&i.self_ty) {
+                    for item in &i.items {
+                        let (name, kind) = match item {
+                            parse::ImplItem::Fn(f) => (f.ident.to_string(), "an impl method"),
+                            parse::ImplItem::Const(c) => (c.ident.to_string(), "an impl const"),
+                            parse::ImplItem::Type(t) => (t.ident.to_string(), "an impl type alias"),
+                        };
+                        out.push(GlobalName {
+                            name: ir::mangle(&[&prefix, &name]),
+                            kind,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Ensure the synthesized `default()` method's mangled name does not
+/// collide with any global name the module declares.
+///
+/// Synthesis happens after monomorphize's `reserved_names` pass, so
+/// without this check a module could declare e.g. a free
+/// `fn Kind_default()` alongside a `#[default]` enum — rendering two
+/// functions of the same name and failing WGSL validation far from the
+/// cause.
+fn ensure_default_name_is_free(items: &[parse::Item], e: &parse::ItemEnum) -> Result<()> {
+    let mangled = ir::mangle(&[&e.ident.to_string(), "default"]);
+    for global in wgsl_global_names(items) {
+        if global.name == mangled {
+            return UnsupportedSnafu {
+                span: e.ident.span(),
+                note: format!(
+                    "`#[default]` on this enum synthesizes a `{mangled}` method, which collides \
+                     with {} also named `{mangled}`; rename one of them",
+                    global.kind
+                ),
+            }
+            .fail();
+        }
+    }
+    Ok(())
+}
+
 /// Convert a parse module's top-level items to a list of IR items.
 pub fn items_from_parse(items: &[parse::Item]) -> Result<Vec<ir::Item>> {
     let mut out = Vec::new();
     for item in items {
         if let Some(ir_item) = item_from_parse(item)? {
             out.push(ir_item);
+        }
+        // An enum carrying `#[default]` also gets a synthesized
+        // `default()` method, so `Kind::default()` works in both
+        // worlds.
+        if let parse::Item::Enum(e) = item {
+            if let Some(default_impl) = enum_default_impl(e) {
+                ensure_default_name_is_free(items, e)?;
+                out.push(ir::Item::Impl(default_impl));
+            }
         }
     }
     Ok(out)
@@ -227,10 +373,66 @@ fn item_enum(e: &parse::ItemEnum) -> ir::ItemEnum {
                     .discriminant
                     .as_ref()
                     .and_then(|(_, lit)| lit.base10_parse::<u32>().ok()),
+                attrs: v.attrs.clone(),
             })
             .collect(),
         attrs: e.attrs.clone(),
     }
+}
+
+/// Whether an enum variant carries `#[default]`.
+fn is_default_variant(v: &parse::EnumVariant) -> bool {
+    v.attrs
+        .iter()
+        .any(|a| a.path == "default" && a.args.is_empty())
+}
+
+/// Synthesize the inherent `default()` impl for an enum with a
+/// `#[default]` variant, rendering as
+/// `fn Kind_default() -> Kind { return Kind_<Variant>; }` (the member
+/// `default` contains no underscore, so mangling takes the
+/// single-underscore form).
+///
+/// Call sites spelling `Kind::default()` then work in both worlds: the
+/// GPU renders the mangled call, and on the CPU the expression resolves
+/// through the `Default` trait impl generated by `#[derive(Default)]`
+/// — which `#[default]` requires — so the two worlds agree by
+/// construction. Returns `None` when no variant carries `#[default]`.
+///
+/// A module global of the same mangled name (a free function named
+/// `Kind_default`, an impl method named `default` on the same type, a
+/// variant named `default`, ...) is rejected by
+/// `ensure_default_name_is_free` rather than rendered twice.
+fn enum_default_impl(e: &parse::ItemEnum) -> Option<ir::ItemImpl> {
+    let default = e.variants.iter().find(|v| is_default_variant(v))?;
+    let name = e.ident.to_string();
+    Some(ir::ItemImpl {
+        type_params: vec![],
+        const_params: vec![],
+        self_ty: name.clone(),
+        items: vec![ir::ImplItem::Fn(ir::ItemFn {
+            type_params: vec![],
+            const_params: vec![],
+            fn_attrs: ir::FnAttrs::None,
+            name: ::std::borrow::Cow::Owned("default".to_string()),
+            inputs: vec![],
+            return_type: ir::ReturnType::Type {
+                annotation: ir::ReturnTypeAnnotation::None,
+                ty: ir::Type::Struct {
+                    name: name.clone(),
+                    type_args: vec![],
+                },
+            },
+            block: ir::Block {
+                stmts: vec![ir::Stmt::Return(Some(ir::Expr::TypePath {
+                    ty: name,
+                    member: default.ident.to_string(),
+                }))],
+            },
+            attrs: vec![],
+        })],
+        attrs: vec![],
+    })
 }
 
 fn field_from_parse(f: &parse::Field) -> Result<ir::Field> {
