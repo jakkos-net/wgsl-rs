@@ -6572,6 +6572,10 @@ pub struct EnumVariant {
     pub ident: Ident,
     /// Optional explicit discriminant value, e.g., `First = 5`.
     pub discriminant: Option<(Token![=], syn::LitInt)>,
+    /// Attributes preserved from the Rust source on this variant
+    /// (e.g. `#[default]`). Not rendered — exists for downstream
+    /// inspection, like all IR attributes.
+    pub attrs: Vec<ir::Attribute>,
 }
 
 /// An enum declaration.
@@ -6702,6 +6706,7 @@ impl TryFrom<&syn::ItemEnum> for ItemEnum {
             parsed_variants.push(EnumVariant {
                 ident: variant.ident.clone(),
                 discriminant,
+                attrs: syn_attrs_to_ir(&variant.attrs),
             });
         }
 
@@ -8702,6 +8707,32 @@ mod test {
                 assert!(item_enum.variants[2].discriminant.is_some());
                 let (_, lit) = item_enum.variants[0].discriminant.as_ref().unwrap();
                 assert_eq!("1", lit.to_string());
+            }
+            _ => panic!("Expected Item::Enum"),
+        }
+    }
+
+    #[test]
+    fn parse_enum_variant_attrs_are_preserved() {
+        let item: syn::Item = syn::parse_quote! {
+            #[repr(u32)]
+            pub enum Kind {
+                #[default]
+                Alpha,
+                Beta,
+            }
+        };
+        let item = Item::try_from(&item).unwrap();
+        match item {
+            Item::Enum(item_enum) => {
+                // Variant attributes are preserved for downstream
+                // inspection (e.g. `#[default]` detection), like all IR
+                // attributes.
+                assert_eq!(1, item_enum.variants[0].attrs.len());
+                let attr = &item_enum.variants[0].attrs[0];
+                assert_eq!("default", attr.path);
+                assert!(attr.args.is_empty());
+                assert!(item_enum.variants[1].attrs.is_empty());
             }
             _ => panic!("Expected Item::Enum"),
         }

@@ -1,0 +1,6 @@
+error: Parsing error: 'Encountered unsupported Rust syntax:
+       `#[default]` on this enum synthesizes a `Kind_default` method, which collides with an impl const also named `Kind_default`; rename one of them.'
+ --> tests/ui/fail/enum_default_impl_const_collision.rs:7:14
+  |
+7 |     pub enum Kind {
+  |              ^^^^

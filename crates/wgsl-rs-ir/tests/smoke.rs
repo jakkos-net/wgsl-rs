@@ -339,14 +339,17 @@ fn renders_enum_with_auto_discriminants() {
                 EnumVariant {
                     name: "Red".to_string(),
                     discriminant: None,
+                    attrs: vec![],
                 },
                 EnumVariant {
                     name: "Green".to_string(),
                     discriminant: Some(5),
+                    attrs: vec![],
                 },
                 EnumVariant {
                     name: "Blue".to_string(),
                     discriminant: None,
+                    attrs: vec![],
                 },
             ],
             attrs: vec![],

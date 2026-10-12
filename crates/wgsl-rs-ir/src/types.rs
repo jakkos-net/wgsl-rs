@@ -1034,6 +1034,10 @@ pub struct EnumVariant {
     /// Optional explicit discriminant value. When `None`, the renderer
     /// auto-increments from the previous value (starting at 0).
     pub discriminant: Option<u32>,
+    /// Attributes preserved from the Rust source on this variant
+    /// (e.g. `#[default]`). Not rendered — exists for downstream
+    /// inspection, like all IR attributes.
+    pub attrs: Vec<Attribute>,
 }
 
 /// An enum definition. Renders as a `u32` alias plus per-variant `const`s.

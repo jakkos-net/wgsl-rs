@@ -183,3 +183,21 @@ fn trait_default_method_body_is_rejected() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/ui/fail/trait_default_method_body.rs");
 }
+
+#[test]
+fn enum_default_name_collision_is_rejected() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/ui/fail/enum_default_name_collision.rs");
+}
+
+#[test]
+fn enum_default_impl_const_collision_is_rejected() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/ui/fail/enum_default_impl_const_collision.rs");
+}
+
+#[test]
+fn enum_default_generic_entry_point_collision_is_rejected() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/ui/fail/enum_default_generic_entry_point_collision.rs");
+}

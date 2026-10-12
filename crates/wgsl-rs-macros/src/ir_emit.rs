@@ -208,10 +208,12 @@ pub fn emit_item(p: &TokenStream, i: &ir::Item) -> TokenStream {
                     Some(d) => quote! { ::std::option::Option::Some(#d) },
                     None => quote! { ::std::option::Option::None },
                 };
+                let vattrs = emit_attrs(p, &v.attrs);
                 quote! {
                     #p::EnumVariant {
                         name: ::std::string::String::from(#nm),
                         discriminant: #d,
+                        #vattrs,
                     }
                 }
             });
