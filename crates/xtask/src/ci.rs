@@ -75,6 +75,23 @@ impl CiAction {
             }
             CiAction::DocTests => cmd("cargo", "test --doc --all-features"),
             CiAction::LinkageMatrix => {
+                // The version crates keep identical copies of the canonical
+                // linkage template (a #[path] include would compile in the
+                // workspace but cannot resolve inside a published package).
+                // Fail fast, with instructions, if the copies drift.
+                let canonical =
+                    std::fs::read_to_string("crates/wgsl-rs-linkage-wgpu-v30/src/lib.rs")
+                        .expect("read canonical linkage template");
+                let v29 = std::fs::read_to_string("crates/wgsl-rs-linkage-wgpu-v29/src/lib.rs")
+                    .expect("read v29 linkage template");
+                if canonical != v29 {
+                    panic!(
+                        "crates/wgsl-rs-linkage-wgpu-v29/src/lib.rs drifted from the canonical \
+                         template; re-copy crates/wgsl-rs-linkage-wgpu-v30/src/lib.rs over it \
+                         (or, if a wgpu major genuinely diverges, fork the copy deliberately and \
+                         adjust this check)"
+                    );
+                }
                 // Each supported major's version crate directly, plus the
                 // facade at both its default (latest) and pinned-vNN
                 // feature combinations. wgpu majors do not interop, so

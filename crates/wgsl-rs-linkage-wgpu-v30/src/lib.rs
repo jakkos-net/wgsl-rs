@@ -1,11 +1,11 @@
-//! Runtime wgpu linkage analysis for WGSL modules, compiled against
-//! wgpu 30.
+//! Runtime wgpu linkage analysis for WGSL modules.
 //!
-//! This file is the canonical linkage implementation: older-major
-//! crates (e.g. `wgsl-rs-linkage-wgpu-v29`) compile this same source
-//! against their pinned wgpu via `#[path]`, so there is exactly one
-//! implementation to maintain. A version crate forks a local copy only
-//! when a wgpu major actually diverges from this API.
+//! This file is the canonical linkage implementation, compiled by each
+//! version crate (`wgsl-rs-linkage-wgpu-v30`, `wgsl-rs-linkage-wgpu-v29`,
+//! ...) against its pinned `wgpu`. The version crates keep identical
+//! copies of this file; `cargo xtask ci linkage-matrix` fails if they
+//! drift. A version crate forks its copy only when a wgpu major
+//! actually diverges from this API.
 //!
 //! Given an [`ir::Module`] (produced by a `#[wgsl]` source's
 //! `WGSL_SOURCE.ir_constructor`, or by the macro-emitted

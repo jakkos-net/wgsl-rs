@@ -35,8 +35,9 @@ use wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module;
 ```
 
 Both majors may be enabled at once (feature unification); the modules
-coexist with distinct, incompatible wgpu types, and the crate root always
-re-exports the latest.
+coexist with distinct, incompatible wgpu types, and the crate root
+re-exports the latest (the root is intentionally absent in a pinned
+vNN-only build).
 
 See [Cargo Features](../getting-started/cargo-features.md).
 
@@ -49,19 +50,26 @@ renders the WGSL source via `ir::render_module`. You get one of two ways:
 use wgsl_rs_linkage_wgpu::{analyze_wgsl_module, analyze_ir_module, WgpuLinkage};
 
 // From a concrete (non-template) Source:
-let linkage: WgpuLinkage = analyze_wgsl_module(&my_shader::SOURCE)?;
+let linkage: WgpuLinkage = analyze_wgsl_module(&my_shader::WGSL_SOURCE)?;
 
 // From an instantiated template's IR (see [Template Modules & Instantiation](../generics/templates.md)):
-let concrete_ir: ir::Module = template.instantiate::<f32, u32>()?;
+let concrete_ir: ir::Module = template.instantiate::<f32, u32>();
 let linkage: WgpuLinkage = analyze_ir_module(concrete_ir);
 ```
 
-`Source` and `ir::Module` both expose `generate_linkage()` — an extension
-trait method (`IrModuleExt`) exported from the linkage crate's root:
+Concrete IR modules also expose `generate_linkage()` — an extension
+trait method (`IrModuleExt`) exported from the linkage crate's root —
+as a shorthand for `analyze_ir_module`. For a `Source`, use
+`analyze_wgsl_module`:
 
 ```rust
 use wgsl_rs_linkage_wgpu::*;
-let linkage = my_shader::SOURCE.generate_linkage()?;
+
+// From a concrete IR module (e.g. a template instantiation):
+let linkage = template.instantiate::<f32, u32>().generate_linkage();
+
+// From a Source:
+let linkage = analyze_wgsl_module(&my_shader::WGSL_SOURCE)?;
 ```
 
 ## What `WgpuLinkage` provides

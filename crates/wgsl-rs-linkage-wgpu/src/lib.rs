@@ -19,8 +19,9 @@
 //! ```
 //!
 //! Both majors may be enabled at once (the modules coexist with
-//! distinct, incompatible wgpu types); the crate root always re-exports
-//! the latest.
+//! distinct, incompatible wgpu types); the crate root re-exports the
+//! latest enabled major, and is intentionally absent in a vNN-only
+//! build so pinned code uses the stable versioned module path.
 //!
 //! Why a facade: linkage output is wgpu types, which do not interop
 //! across majors, so each supported major gets its own crate
@@ -39,9 +40,9 @@ pub mod v30 {
     pub use wgsl_rs_linkage_wgpu_v30::*;
 }
 
-// The crate root always implies the latest enabled major.
+// The crate root implies the latest supported major, and only that:
+// the root is intentionally absent in a v29-only build, so pinned code
+// uses the stable versioned module path and can never be silently
+// re-pointed at incompatible types by feature unification.
 #[cfg(feature = "v30")]
 pub use v30::*;
-
-#[cfg(all(feature = "v29", not(feature = "v30")))]
-pub use v29::*;

@@ -22,27 +22,44 @@ match source.wgsl_source() {
 
 ## `wgsl_rs_linkage_wgpu::Error`
 
-Raised by the `wgsl-rs-linkage-wgpu` crates when reflecting bind groups and pipeline layouts.
+Raised by the `wgsl-rs-linkage-wgpu` crates when analyzing a source or
+creating a bind group by name.
 
-| Variant              | When                                                                |
-|----------------------|---------------------------------------------------------------------|
-| `TemplateResolution` | A linkage query was made against a template that has not been instantiated with concrete types. |
-| `NoSuchBindGroup`    | The queried bind group index does not exist in the module.          |
-| `NoSuchBinding`      | The queried binding within a bind group does not exist.             |
-| `TypeMismatch`       | A binding's type does not match the expected wgpu binding type.     |
+| Variant                        | When                                                          |
+|--------------------------------|---------------------------------------------------------------|
+| `TemplateResolution { .. }`    | Analysis was requested for a template source that has not been instantiated with concrete types. |
+| `NoSuchBindGroup { .. }`       | `create_bind_group_named` was called for a `@group(N)` the module does not declare. |
+| `MissingBinding { .. }`        | A named-resource bind group creation is missing a resource for one of the group's declared binding names. |
+| `UnknownBindingName { .. }`    | A named-resource creation provided a resource for a name the group does not declare. |
+| `DuplicateBindingName { .. }`  | A named-resource creation provided the same binding name twice. |
+
+All variants are struct variants; match them with `{ .. }` patterns.
 
 ### Recovery
 
+Bind group *lookups* return `Option`, not `Result` (`linkage.bind_group(0)`),
+so recovery there is ordinary `Option` handling. Only analysis and
+named-resource bind group creation return `Error`:
+
 ```rust
-match source.linkage().bind_group(0) {
-    Ok(group) => { /* build BindGroupLayout */ }
-    Err(wgsl_rs_linkage_wgpu::Error::NoSuchBindGroup) => {
-        // bind group 0 not declared in this shader
+use wgsl_rs_linkage_wgpu::{analyze_wgsl_module, Error};
+
+// Analysis is the only source of `TemplateResolution`: instantiate the
+// template with concrete types first, then analyze the concrete IR.
+match analyze_wgsl_module(&my_shader::WGSL_SOURCE) {
+    Ok(linkage) => { /* build pipelines */ }
+    Err(Error::TemplateResolution { .. }) => {
+        let linkage = analyze_ir_module(my_shader::instantiate::<f32, u32>());
     }
-    Err(wgsl_rs_linkage_wgpu::Error::TemplateResolution) => {
-        let concrete = source.instantiate(&[concrete_type])?;
-        let group = concrete.linkage().bind_group(0)?;
+}
+
+// Named-resource bind group creation surfaces the binding-name variants:
+match linkage.create_bind_group_named(0, &device, &[("FRAME", binding)]) {
+    Ok(bind_group) => { /* bind it */ }
+    Err(Error::MissingBinding { .. }) => {
+        // a declared binding had no resource provided
     }
+    Err(_) => { /* NoSuchBindGroup, UnknownBindingName, DuplicateBindingName */ }
 }
 ```
 

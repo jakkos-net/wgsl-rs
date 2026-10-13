@@ -5,7 +5,7 @@
 | Feature             | Default? | Description                                                                |
 |---------------------|----------|----------------------------------------------------------------------------|
 | `validation`        | Yes      | Compile-time WGSL validation of generated source                           |
-| `dispatch-runtime`  | No       | Enable runtime dispatch support                                            |
+| `dispatch-runtime`  | Yes      | Enable runtime dispatch support                                            |
 
 ## `wgsl-rs-linkage-wgpu`
 

@@ -1635,11 +1635,15 @@ crates, one per supported wgpu major:
   `wgpu = "30"`, re-exporting `pub use wgpu` so consumers get every
   produced type from one path.
 - `wgsl-rs-linkage-wgpu-v29` compiles *the same source* against
-  `wgpu = "29"` via a `#[path]` include. There is exactly one
-  implementation to maintain; a version crate forks a local copy only
-  when a wgpu major actually diverges from the template (first
-  divergence found so far: wgpu 30's `RequestAdapterOptions` gained
-  `apply_limit_buckets`, but that was in test code, not the template).
+  `wgpu = "29"` — the version crates keep byte-identical copies of the
+  canonical file, and `cargo xtask ci linkage-matrix` fails if they
+  drift. (A `#[path]` include of the v30 crate's file worked in the
+  workspace but cannot resolve inside a published package: registry
+  tarballs are self-contained, and cargo's package verification failed
+  on it. A version crate forks its copy only when a wgpu major actually
+  diverges from the template; first divergence found so far: wgpu 30's
+  `RequestAdapterOptions` gained `apply_limit_buckets`, but that was in
+  test code, not the template.)
 - `wgsl-rs-linkage-wgpu` is the facade: default features pull only the
   latest major and re-export it at the crate root ("`linkage-wgpu`
   implies the latest one"); each older major is a feature-gated `vNN`
@@ -1659,9 +1663,12 @@ the template moves to the newest version crate and older majors get
 version crates built from it (forking where APIs diverge). The facade
 flips to the newest, which is a semver-breaking change to the facade —
 fine at 0.x. Older-major crates are maintained on request. Both majors
-stay green in CI via `cargo xtask ci linkage-matrix` (each version crate
-directly, plus the facade at default and pinned-vNN feature
-combinations).
+stay green in CI via `cargo xtask ci linkage-matrix` (which also fails
+if the version crates' template copies drift, then builds and tests
+each version crate directly, plus the facade at default and
+pinned-vNN feature combinations). Publishing order matters: `wgsl-rs`
+and the version crates must be on the registry before the facade,
+whose dependencies they are.
 
 **Related correctness change.** wgpu 30 / naga 30 no longer imply
 `@interpolate(flat)` for integer-typed `@location` shader IO. The IR

@@ -1,6 +1,6 @@
 # Cargo Features
 
-`wgsl-rs` exposes two cargo features. Only `validation` is on by default.
+`wgsl-rs` exposes two cargo features, and both are on by default.
 
 ## `validation` (default)
 
@@ -50,20 +50,21 @@ the full API.
 
 ## Combining features
 
-Features compose freely. A typical application crate enables the CPU
-dispatch runtime and adds the linkage crate:
-
-```toml
-[dependencies]
-wgsl-rs = { version = "0.1", features = ["dispatch-runtime"] }
-wgsl-rs-linkage-wgpu = "0.1"
-```
-
-A shader-only library crate leaves everything at defaults:
+Features compose freely. A typical application crate leaves `wgsl-rs` at
+its defaults (`validation` and `dispatch-runtime` are both on) and adds
+the linkage crate:
 
 ```toml
 [dependencies]
 wgsl-rs = "0.1"
+wgsl-rs-linkage-wgpu = "0.1"
+```
+
+A shader-only library crate strips the defaults it doesn't need:
+
+```toml
+[dependencies]
+wgsl-rs = { version = "0.1", default-features = false, features = ["validation"] }
 ```
 
 ## Reference
@@ -71,7 +72,7 @@ wgsl-rs = "0.1"
 | Feature            | Default | Module path                 | When to use                                     |
 | ------------------ | ------- | --------------------------- | ----------------------------------------------- |
 | `validation`       | on      | (macro-internal, naga)      | Always, unless you strip naga deliberately.     |
-| `dispatch-runtime` | off     | `wgsl_rs::std::runtime`     | CPU-side fragment dispatch and roundtrip tests. |
+| `dispatch-runtime` | on      | `wgsl_rs::std::runtime`     | CPU-side fragment dispatch and roundtrip tests. |
 
 | Separate crate               | Default        | When to use                                  |
 | ---------------------------- | -------------- | -------------------------------------------- |

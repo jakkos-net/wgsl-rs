@@ -19,7 +19,10 @@ validation = ["wgsl-rs/validation"]
 
 [dependencies]
 snafu.workspace = true
-wgsl-rs = { version = "0.1.0-beta.4", path = "../wgsl-rs" }
+# default-features = false: the crate's own `validation` feature is the
+# sole forwarding path, so `--no-default-features` builds stay lean
+# (no naga validation, no rayon dispatch runtime).
+wgsl-rs = { version = "0.1.0-beta.4", path = "../wgsl-rs", default-features = false }
 wgsl-rs-ir = { version = "0.1.0-beta.4", path = "../wgsl-rs-ir" }
 wgpu = "30"
 
