@@ -54,6 +54,10 @@ use wgsl_rs_ir as ir;
 
 use wgsl_rs::Source;
 
+// Re-export the pinned wgpu so linkage consumers can import every type
+// the API produces from one path.
+pub use wgpu;
+
 /// Errors thrown by the WGPU linkage module.
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -2246,7 +2250,3 @@ mod binding_visibility {
         );
     }
 }
-
-// Re-export the pinned wgpu so linkage consumers can import every type
-// the API produces from one path.
-pub use wgpu;
