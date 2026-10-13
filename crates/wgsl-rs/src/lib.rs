@@ -1212,4 +1212,59 @@ mod test {
         assert!(!src.contains("__TPDATA__"));
         assert!(src.contains("DATA"));
     }
+
+    // --- Integer inter-stage IO (explicit @interpolate(flat)) ---
+
+    // WGSL §13.3.1.4: user-defined vertex outputs and fragment inputs of
+    // integer type must always be declared `@interpolate(flat)`. wgpu 30 /
+    // naga 30 no longer imply it, so the renderer emits the attribute
+    // explicitly when the source does not. The `__validate_wgsl` test
+    // auto-emitted for this module fails under naga 30 if the emission
+    // goes missing.
+    #[wgsl(crate_path = crate)]
+    pub mod integer_io {
+        use crate::std::*;
+
+        /// Vertex output / fragment input — a single struct shared across
+        /// stages, carrying an integer varying at `@location(1)`.
+        pub struct Varyings {
+            #[builtin(position)]
+            pub clip_position: Vec4f,
+            #[location(0)]
+            pub uv: Vec2f,
+            #[location(1)]
+            pub material: u32,
+        }
+
+        #[vertex]
+        pub fn vtx_main(#[builtin(vertex_index)] vertex_index: u32) -> Varyings {
+            let x = f32((vertex_index & 1u32) * 2u32) * 2.0 - 1.0;
+            let y = f32((vertex_index >> 1u32) * 2u32) * 2.0 - 1.0;
+            Varyings {
+                clip_position: vec4f(x, y, 0.0, 1.0),
+                uv: vec2f((x + 1.0) / 2.0, (y + 1.0) / 2.0),
+                material: vertex_index % 3u32,
+            }
+        }
+
+        #[fragment]
+        pub fn frag_main(input: Varyings) -> Vec4f {
+            vec4f(input.uv.x, input.uv.y, f32(input.material), 1.0)
+        }
+    }
+
+    #[test]
+    fn integer_location_io_carries_explicit_flat() {
+        let src = integer_io::WGSL_SOURCE
+            .wgsl_source()
+            .expect("non-template source renders");
+        assert!(
+            src.contains("@location(1) @interpolate(flat) material: u32"),
+            "integer location must carry explicit @interpolate(flat), got:\n{src}"
+        );
+        assert!(
+            !src.contains("@location(0) @interpolate"),
+            "float location keeps default interpolation, got:\n{src}"
+        );
+    }
 }
