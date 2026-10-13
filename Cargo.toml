@@ -39,5 +39,5 @@ quote = "1.0"
 snafu = "0.8.9"
 syn = { version = "2.0", features = ["full", "printing", "extra-traits", "visit-mut"] }
 bytemuck = { version = "1", features = ["derive"] }
-wgpu = "29"
+wgpu = "30"
 winit = "0.30"

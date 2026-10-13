@@ -85,6 +85,7 @@ async fn get_adapter_device_and_queue_inner() -> Option<(wgpu::Adapter, wgpu::De
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: None,
             force_fallback_adapter: false,
+            apply_limit_buckets: false,
         })
         .await
         .map_err(|e| eprintln!("{e}"))
@@ -209,7 +210,7 @@ fn readback_inner(
         .map_err(|_| "buffer mapping channel closed")?
         .map_err(|_| "buffer mapping failed")?;
 
-    let data = staging.slice(..).get_mapped_range();
+    let data = staging.slice(..).get_mapped_range().unwrap();
     let mut pixels = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
         let row_offset = (y * bytes_per_row) as usize;
@@ -274,8 +275,7 @@ fn integer_varying_renders_flat_on_gpu() {
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let mut linkage =
-        wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&integer_varying_shader::WGSL_SOURCE)
-            .unwrap();
+        wgsl_rs_linkage_wgpu::analyze_wgsl_module(&integer_varying_shader::WGSL_SOURCE).unwrap();
     let module = linkage.shader_module(&device);
     let pipeline_layout = linkage.pipeline_layout(&device, Some("integer_varying"));
 

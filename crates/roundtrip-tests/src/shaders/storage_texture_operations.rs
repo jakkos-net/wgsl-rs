@@ -144,7 +144,7 @@ fn run_gpu_compute(
     );
 
     let module = &storage_texture_compute::WGSL_SOURCE;
-    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(module).unwrap();
     let shader_module = linkage.shader_module(device);
     let pipeline_layout = linkage.pipeline_layout(device, Some("storage_texture_pipeline_layout"));
 
@@ -237,7 +237,7 @@ fn run_gpu_compute(
         .expect("channel recv failed")
         .expect("buffer mapping failed");
 
-    let data = output_buffer.slice(..).get_mapped_range();
+    let data = output_buffer.slice(..).get_mapped_range().unwrap();
     let mut rgba8: Vec<[u8; 4]> = Vec::with_capacity((WIDTH * HEIGHT) as usize);
     for y in 0..HEIGHT {
         let row_offset = (y * aligned_bpr) as usize;

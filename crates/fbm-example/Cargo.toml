@@ -11,4 +11,4 @@ log.workspace = true
 winit.workspace = true
 wgpu.workspace = true
 wgsl-rs = { path = "../wgsl-rs" }
-wgsl-rs-linkage-wgpu = { path = "../wgsl-rs-linkage-wgpu", default-features = false, features = ["v29"] }
+wgsl-rs-linkage-wgpu = { path = "../wgsl-rs-linkage-wgpu" }

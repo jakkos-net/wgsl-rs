@@ -238,7 +238,7 @@ impl RoundtripTest for TypeConversionsTest {
             let output_size = (N * std::mem::size_of::<u32>()) as u64;
 
             let mut linkage =
-                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&convert_f32_to_u32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&convert_f32_to_u32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -278,7 +278,7 @@ impl RoundtripTest for TypeConversionsTest {
             let output_size = (N * std::mem::size_of::<u32>()) as u64;
 
             let mut linkage =
-                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&convert_f32_to_i32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&convert_f32_to_i32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -318,7 +318,7 @@ impl RoundtripTest for TypeConversionsTest {
             let output_size = (N * std::mem::size_of::<f32>()) as u64;
 
             let mut linkage =
-                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&convert_u32_to_f32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&convert_u32_to_f32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -366,7 +366,7 @@ impl RoundtripTest for TypeConversionsTest {
             let output_size = (N * std::mem::size_of::<f32>()) as u64;
 
             let mut linkage =
-                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&convert_i32_to_f32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&convert_i32_to_f32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -414,7 +414,7 @@ impl RoundtripTest for TypeConversionsTest {
             let output_size = (N * std::mem::size_of::<u32>()) as u64;
 
             let mut linkage =
-                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&convert_u32_to_i32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&convert_u32_to_i32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,

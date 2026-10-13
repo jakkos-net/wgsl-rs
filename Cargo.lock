@@ -653,7 +653,7 @@ dependencies = [
  "glam",
  "log",
  "naga 30.0.1",
- "wgpu 29.0.2",
+ "wgpu 30.0.1",
  "wgsl-rs",
  "wgsl-rs-linkage-wgpu",
  "winit",
@@ -672,7 +672,7 @@ dependencies = [
  "bytemuck",
  "futures",
  "log",
- "wgpu 29.0.2",
+ "wgpu 30.0.1",
  "wgsl-rs",
  "wgsl-rs-linkage-wgpu",
  "winit",
@@ -987,7 +987,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "futures",
- "wgpu 29.0.2",
+ "wgpu 30.0.1",
  "wgsl-rs",
  "wgsl-rs-linkage-wgpu",
 ]
@@ -2587,7 +2587,7 @@ dependencies = [
  "bytemuck",
  "clap",
  "futures",
- "wgpu 29.0.2",
+ "wgpu 30.0.1",
  "wgsl-rs",
  "wgsl-rs-linkage-wgpu",
 ]
