@@ -139,9 +139,14 @@ The project is split into a few parts:
 - **`wgsl-rs-macros`** — The `wgsl` procedural macro for writing WGSL modules
   in Rust. Handles parsing and code generation for the supported Rust subset.
 - **`wgsl-rs`** — The `Source`/`Module` types, `wgsl::std`, the `wgsl` macro
-  re-export, extensions, and wgpu linkage.
+  re-export, and extensions. Wgpu-free.
 - **`wgsl-rs-ir`** — The owned IR (`Module`, `Type`, `Expr`, `Stmt`, `Item`),
   `render_module`, and `substitute_types`.
+- **`wgsl-rs-linkage-wgpu`** / **`wgsl-rs-linkage-wgpu-v29`** /
+  **`wgsl-rs-linkage-wgpu-v30`** — wgpu linkage generation (bind group
+  layouts, entry-point state, buffer descriptors), one crate per supported
+  wgpu major. The unversioned facade defaults to the latest major; the
+  versioned crates are compiled against their pinned `wgpu`.
 - **`wgsl-rs-layout`** / **`wgsl-rs-layout-macros`** — WGSL memory layout
   computation (`WgslLayout`/`Layout` traits, `#[derive(Layout)]`).
 - **`example`** — Runnable example modules demonstrating every supported

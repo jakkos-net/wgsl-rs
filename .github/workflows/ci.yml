@@ -89,6 +89,9 @@ jobs:
       - name: Unit tests
         run: cargo xtask ci unit-tests
 
+      - name: Linkage crate feature matrix
+        run: cargo xtask ci linkage-matrix
+
       - name: Doc tests
         run: cargo xtask ci doc-tests
 

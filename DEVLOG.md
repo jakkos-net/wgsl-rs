@@ -1613,3 +1613,59 @@ not cover impl-method mangled names. Synthesis happens only when
 
 Semver: additive IR field plus new synthesis — next beta bump, which
 crabslab needs (its extension is the consumer that motivated this).
+
+### 2026-10-14: Versioned wgpu linkage crates
+
+**Problem.** wgpu linkage output is wgpu *types* (`BindGroupLayout`,
+`ShaderModule`, `VertexState`, ...), and wgpu majors are semver-
+incompatible: a `BindGroupLayout` from wgpu 29 and one from wgpu 30 are
+distinct, non-interoperating types in the same build. Linkage lived
+inside `wgsl-rs` behind a `linkage-wgpu` feature with a single optional
+`wgpu` dependency, so a crate can pin exactly one major — every user was
+forced onto whatever `wgsl-rs` happened to pin, and users on the other
+major could not use linkage at all. Cargo features cannot fix this:
+feature unification across a dependency graph collapses to one resolved
+`wgpu` per build.
+
+**Decision.** Linkage generation moves out of `wgsl-rs` into versioned
+crates, one per supported wgpu major:
+
+- `wgsl-rs-linkage-wgpu-v30` owns the canonical implementation (the
+  former `crates/wgsl-rs/src/linkage/wgpu.rs`) and compiles it against
+  `wgpu = "30"`, re-exporting `pub use wgpu` so consumers get every
+  produced type from one path.
+- `wgsl-rs-linkage-wgpu-v29` compiles *the same source* against
+  `wgpu = "29"` via a `#[path]` include. There is exactly one
+  implementation to maintain; a version crate forks a local copy only
+  when a wgpu major actually diverges from the template (first
+  divergence found so far: wgpu 30's `RequestAdapterOptions` gained
+  `apply_limit_buckets`, but that was in test code, not the template).
+- `wgsl-rs-linkage-wgpu` is the facade: default features pull only the
+  latest major and re-export it at the crate root ("`linkage-wgpu`
+  implies the latest one"); each older major is a feature-gated `vNN`
+  module. Gating keeps users compiling only the wgpu they use — wgpu is
+  minutes of build time. Both majors may be enabled at once (feature
+  unification); the modules coexist with distinct, incompatible types,
+  and the root always re-exports the latest.
+
+The facade cannot live inside `wgsl-rs`: the version crates depend on
+`wgsl-rs` (for `Source`, `ir`, rendering), and cargo forbids dependency
+cycles. `wgsl-rs` is now wgpu-free; the `linkage-wgpu` feature, the
+optional `wgpu` dep, and the vestigial `wgsl-rs-macros/linkage-wgpu`
+no-op feature are all removed.
+
+**Policy.** A new crate per wgpu major, on demand: when a major ships,
+the template moves to the newest version crate and older majors get
+version crates built from it (forking where APIs diverge). The facade
+flips to the newest, which is a semver-breaking change to the facade —
+fine at 0.x. Older-major crates are maintained on request. Both majors
+stay green in CI via `cargo xtask ci linkage-matrix` (each version crate
+directly, plus the facade at default and pinned-vNN feature
+combinations).
+
+**Related correctness change.** wgpu 30 / naga 30 no longer imply
+`@interpolate(flat)` for integer-typed `@location` shader IO. The IR
+renderer now emits it explicitly whenever the source omits it (WGSL
+§13.3.1.4 requires it; valid on wgpu 29 too), and the workspace `naga`
+dependency tracks the latest wgpu's naga so CPU-side validation matches
+what devices enforce.

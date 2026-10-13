@@ -21,6 +21,8 @@ pub enum CiAction {
     RoundtripTests,
     /// Run documentation tests.
     DocTests,
+    /// Run the wgpu-linkage crate feature matrix.
+    LinkageMatrix,
     /// Run all tests.
     AllTests,
     /// Install clippy CI deps.
@@ -72,10 +74,24 @@ impl CiAction {
                 cmd("cargo", "run -p roundtrip-tests");
             }
             CiAction::DocTests => cmd("cargo", "test --doc --all-features"),
+            CiAction::LinkageMatrix => {
+                // Each supported major's version crate directly, plus the
+                // facade at both its default (latest) and pinned-vNN
+                // feature combinations. wgpu majors do not interop, so
+                // every buildable configuration must stay green.
+                cmd("cargo", "test -p wgsl-rs-linkage-wgpu-v29");
+                cmd("cargo", "test -p wgsl-rs-linkage-wgpu-v30");
+                cmd("cargo", "test -p wgsl-rs-linkage-wgpu");
+                cmd(
+                    "cargo",
+                    "test -p wgsl-rs-linkage-wgpu --no-default-features --features v29",
+                );
+            }
             CiAction::AllTests => {
                 CiAction::UnitTests.run();
                 CiAction::RoundtripTests.run();
                 CiAction::DocTests.run();
+                CiAction::LinkageMatrix.run();
             }
             CiAction::InstallClippyDeps => Self::ensure_clippy_sarif(),
             CiAction::Clippy => cmd(
