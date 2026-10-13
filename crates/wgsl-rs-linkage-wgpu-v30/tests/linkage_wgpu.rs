@@ -1,18 +1,18 @@
 //! Integration tests for the runtime wgpu linkage analyzer.
 //!
-//! These tests exercise `wgsl_rs::linkage::wgpu::analyze_wgsl_module` and
+//! These tests exercise `wgsl_rs_linkage_wgpu_v30::analyze_wgsl_module` and
 //! `analyze_module` against small `#[wgsl]` modules. They don't require
 //! a GPU; they inspect the produced `WgpuLinkage` and assert on its
 //! shape and the buffer sizes computed from WGSL §14.4.1.
+//!
+//! (The same tests compile against wgpu 29 too: the v29 crate builds
+//! this crate's lib source, and its own template unit tests run under
+//! both majors.)
 
-#![cfg(feature = "linkage-wgpu")]
-
+use wgsl_rs::ir::{self, FnAttrs, StorageAccess, TextureDepthKind, TextureKind};
 #[allow(unused_imports)]
 use wgsl_rs::wgsl;
-use wgsl_rs::{
-    ir::{self, FnAttrs, StorageAccess, TextureDepthKind, TextureKind},
-    linkage::wgpu::{self as wg, IrModuleExt},
-};
+use wgsl_rs_linkage_wgpu_v30::{self as wg, IrModuleExt};
 
 // ===== Test modules =====
 
@@ -763,7 +763,6 @@ fn compute_workgroup_size_defaults_to_one() {
 /// Helper: returns a `wgpu::Device` for tests, or `None` if no GPU is
 /// available. Tests that need a real device (the happy-path
 /// `create_named` test) should early-return when this is `None`.
-#[cfg(feature = "linkage-wgpu")]
 fn test_device() -> Option<wgpu::Device> {
     use futures::executor::block_on;
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -774,6 +773,9 @@ fn test_device() -> Option<wgpu::Device> {
         power_preference: wgpu::PowerPreference::default(),
         compatible_surface: None,
         force_fallback_adapter: false,
+        // wgpu 30 added limit bucketing; keep historical adapter
+        // limits/features unadjusted.
+        apply_limit_buckets: false,
     }))
     .ok()?;
     let (device, _queue) =
@@ -781,7 +783,6 @@ fn test_device() -> Option<wgpu::Device> {
     Some(device)
 }
 
-#[cfg(feature = "linkage-wgpu")]
 fn linkage_with_two_uniforms() -> wg::WgpuLinkage {
     let ir_module = ir::Module {
         name: "two_uni",
@@ -806,7 +807,6 @@ fn linkage_with_two_uniforms() -> wg::WgpuLinkage {
     ir_module.generate_linkage()
 }
 
-#[cfg(feature = "linkage-wgpu")]
 fn make_uniform_buffer(device: &wgpu::Device, label: &str) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(label),
@@ -939,7 +939,6 @@ fn create_named_duplicate_binding() {
 /// Helper: a linkage with two bind groups (group 0 with one uniform,
 /// group 1 with one uniform) so we can verify `pipeline_layout` returns
 /// layouts in ascending group order.
-#[cfg(feature = "linkage-wgpu")]
 fn linkage_with_two_groups() -> wg::WgpuLinkage {
     let ir_module = ir::Module {
         name: "two_groups",
@@ -965,7 +964,6 @@ fn linkage_with_two_groups() -> wg::WgpuLinkage {
 }
 
 /// Helper: a linkage with no bind groups (e.g. a depth-only pipeline).
-#[cfg(feature = "linkage-wgpu")]
 fn linkage_with_no_groups() -> wg::WgpuLinkage {
     let ir_module = ir::Module {
         name: "no_groups",

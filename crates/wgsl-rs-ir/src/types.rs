@@ -1081,7 +1081,8 @@ impl Module {
     /// macro-emitted `instantiate::<…>()` to obtain a concrete IR module.
     ///
     /// For methods that need access to `wgsl-rs` types (e.g. `WgpuLinkage`),
-    /// see the `wgsl_rs::linkage::wgpu::IrModuleExt` extension trait.
+    /// see the `wgsl_rs_linkage_wgpu::IrModuleExt` extension trait in the
+    /// `wgsl-rs-linkage-wgpu` crates.
     pub fn wgsl_source(&self) -> String {
         let mut module = self.clone();
         crate::suffix_module(&mut module);

@@ -434,7 +434,7 @@ impl RoundtripTest for BasicNumericTest {
             let output_size = (320 * std::mem::size_of::<f32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&abs_f32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&abs_f32::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -485,7 +485,7 @@ impl RoundtripTest for BasicNumericTest {
             let output_size = (320 * std::mem::size_of::<i32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&abs_i32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&abs_i32::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -539,7 +539,7 @@ impl RoundtripTest for BasicNumericTest {
             let output_size = (320 * std::mem::size_of::<f32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&sign_f32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&sign_f32::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -592,7 +592,7 @@ impl RoundtripTest for BasicNumericTest {
             let output_size = (320 * std::mem::size_of::<f32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&degrees_f32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&degrees_f32::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -643,7 +643,7 @@ impl RoundtripTest for BasicNumericTest {
             let output_size = (320 * std::mem::size_of::<f32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&radians_f32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&radians_f32::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,

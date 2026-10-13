@@ -274,7 +274,8 @@ fn integer_varying_renders_flat_on_gpu() {
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let mut linkage =
-        wgsl_rs::linkage::wgpu::analyze_wgsl_module(&integer_varying_shader::WGSL_SOURCE).unwrap();
+        wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&integer_varying_shader::WGSL_SOURCE)
+            .unwrap();
     let module = linkage.shader_module(&device);
     let pipeline_layout = linkage.pipeline_layout(&device, Some("integer_varying"));
 

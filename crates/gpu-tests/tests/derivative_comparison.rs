@@ -263,7 +263,7 @@ fn render_single_target(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &derivative_shader::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("derivative_test"));
@@ -338,7 +338,7 @@ fn render_variant_targets(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &derivative_variants_shader::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("variant_test"));

@@ -1,0 +1,30 @@
+[package]
+name = "wgsl-rs-linkage-wgpu-v29"
+version = "0.1.0-beta.4"
+edition = "2024"
+description = "wgpu 29 linkage generation for wgsl-rs shader modules: bind group layouts, entry point state, buffer descriptors."
+license = "MIT"
+repository = "https://github.com/schell/wgsl-rs"
+rust-version = "1.87"
+keywords = ["wgsl", "wgpu", "shader", "gpu"]
+categories = ["graphics", "game-development"]
+
+[features]
+# Forward to wgsl-rs's own validation feature, which provides
+# `wgsl_rs::validate_wgsl_source` (used by `IrModuleExt::validate`).
+# Default-on to match wgsl-rs, where validation has always been a
+# default feature.
+default = ["validation"]
+validation = ["wgsl-rs/validation"]
+
+[dependencies]
+snafu.workspace = true
+wgsl-rs = { version = "0.1.0-beta.4", path = "../wgsl-rs" }
+wgsl-rs-ir = { version = "0.1.0-beta.4", path = "../wgsl-rs-ir" }
+# Local (non-workspace) pin: the workspace `wgpu` entry tracks the
+# latest major for app crates; this crate stays on 29 by design.
+wgpu = "29"
+
+[package.metadata.docs.rs]
+# Document the wgpu re-export alongside the linkage API.
+all-features = true

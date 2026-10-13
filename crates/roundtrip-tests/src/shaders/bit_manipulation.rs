@@ -386,7 +386,8 @@ impl RoundtripTest for BitManipulationTest {
         // --- bit_count_u32: clz, popcount, ctz, reverse_bits ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_count_u32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&bit_count_u32::WGSL_SOURCE)
+                    .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -430,7 +431,8 @@ impl RoundtripTest for BitManipulationTest {
         // --- bit_first_u32: first_leading_bit, first_trailing_bit ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_first_u32::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&bit_first_u32::WGSL_SOURCE)
+                    .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -473,9 +475,10 @@ impl RoundtripTest for BitManipulationTest {
 
         // --- bit_extract_insert_u32: extract_bits, insert_bits ---
         {
-            let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_extract_insert_u32::WGSL_SOURCE)
-                    .unwrap();
+            let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(
+                &bit_extract_insert_u32::WGSL_SOURCE,
+            )
+            .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -520,7 +523,7 @@ impl RoundtripTest for BitManipulationTest {
         // ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_precedence_u32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&bit_precedence_u32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -570,7 +573,7 @@ impl RoundtripTest for BitManipulationTest {
             let output_size = (N * 4 * 4 * std::mem::size_of::<u32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_vector_binary_u32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&bit_vector_binary_u32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -616,7 +619,7 @@ impl RoundtripTest for BitManipulationTest {
             let input_bytes = bytemuck::cast_slice(&flattened);
             let output_size = (N * 4 * 4 * std::mem::size_of::<u32>()) as u64;
 
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(
                 &bit_vector_swizzle_cmp_u32::WGSL_SOURCE,
             )
             .unwrap();
@@ -665,7 +668,7 @@ impl RoundtripTest for BitManipulationTest {
             let output_size = (N * 4 * 4 * std::mem::size_of::<u32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_vector_assign_u32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&bit_vector_assign_u32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -712,7 +715,7 @@ impl RoundtripTest for BitManipulationTest {
             let output_size = (N * 5 * 4 * std::mem::size_of::<i32>()) as u64;
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bit_vector_ops_i32::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&bit_vector_ops_i32::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,

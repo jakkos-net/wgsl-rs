@@ -85,7 +85,7 @@ fn render_basic(device: &wgpu::Device, queue: &wgpu::Queue) -> Vec<[f32; 4]> {
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let mut linkage =
-        wgsl_rs::linkage::wgpu::analyze_wgsl_module(&derivative_basic::WGSL_SOURCE).unwrap();
+        wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&derivative_basic::WGSL_SOURCE).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("derivative_basic"));
@@ -160,7 +160,7 @@ fn render_variants(device: &wgpu::Device, queue: &wgpu::Queue) -> (Vec<[f32; 4]>
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let mut linkage =
-        wgsl_rs::linkage::wgpu::analyze_wgsl_module(&derivative_variants::WGSL_SOURCE).unwrap();
+        wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&derivative_variants::WGSL_SOURCE).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("derivative_variants"));

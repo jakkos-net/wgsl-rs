@@ -2,7 +2,7 @@ use clap::Parser;
 
 mod examples;
 use examples::*;
-use wgsl_rs::linkage::wgpu::{IrModuleExt, analyze_wgsl_module};
+use wgsl_rs_linkage_wgpu::v29::{IrModuleExt, analyze_wgsl_module};
 
 #[derive(Parser)]
 #[command(
@@ -169,7 +169,7 @@ fn build_linkage() {
     }
 
     impl HelloTriangle {
-        fn new(wgpu_stuff: &WgpuStuff) -> Result<Self, wgsl_rs::linkage::wgpu::Error> {
+        fn new(wgpu_stuff: &WgpuStuff) -> Result<Self, wgsl_rs_linkage_wgpu::v29::Error> {
             let device = &wgpu_stuff.device;
             let queue = &wgpu_stuff.queue;
             let frame = 0u32;

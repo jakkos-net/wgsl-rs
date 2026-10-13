@@ -144,7 +144,7 @@ fn run_gpu_compute(
     );
 
     let module = &storage_texture_compute::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let shader_module = linkage.shader_module(device);
     let pipeline_layout = linkage.pipeline_layout(device, Some("storage_texture_pipeline_layout"));
 

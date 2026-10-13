@@ -9,9 +9,9 @@
 //!     deal with shader source files. Instead, you access the module at
 //!     runtime.
 //! 3. How do I run my shaders?
-//!   * That's still up to you, but if your runtime is [`wgpu`](https://crates.io/crates/wgpu), then with the
-//!     `linkage-wgpu` feature provided by this crate you can avoid a lot of boiler plate by having your [linkage
-//!     auto-generated](https://renderling.xyz/wgsl-rs/manual/linkage/overview.html?highlight=generate_linkage#high-level-workflow).
+//!   * That's still up to you, but if your runtime is [`wgpu`](https://crates.io/crates/wgpu),
+//!     then with the [`wgsl-rs-linkage-wgpu`](https://crates.io/crates/wgsl-rs-linkage-wgpu)
+//!     crate you can avoid a lot of boiler plate by having your [linkage auto-generated](https://renderling.xyz/wgsl-rs/manual/linkage/overview.html?highlight=generate_linkage#high-level-workflow).
 //!
 //! For more info see the [Operator's Manual](https://renderling.xyz/wgsl-rs/manual/introduction.html).
 use ::std::collections::{HashMap, HashSet};

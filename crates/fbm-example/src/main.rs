@@ -12,7 +12,7 @@ use std::{sync::Arc, time::Instant};
 
 use futures::executor::block_on;
 use shader::fbm_shader;
-use wgsl_rs::linkage::wgpu::analyze_wgsl_module;
+use wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -76,7 +76,7 @@ struct FbmPipeline {
 }
 
 impl FbmPipeline {
-    fn new(gpu: &GpuContext) -> Result<Self, wgsl_rs::linkage::wgpu::Error> {
+    fn new(gpu: &GpuContext) -> Result<Self, wgsl_rs_linkage_wgpu::v29::Error> {
         let device = &gpu.device;
 
         // Runtime IR-based wgpu linkage analysis (issue #120).

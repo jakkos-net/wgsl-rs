@@ -122,7 +122,7 @@ impl RoundtripTest for TrigTest {
         // --- trig_basic: sin, cos, tan, asin ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&trig_basic::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&trig_basic::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -168,7 +168,7 @@ impl RoundtripTest for TrigTest {
         // --- trig_inverse: acos, atan, atan2 ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&trig_inverse::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&trig_inverse::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -213,7 +213,8 @@ impl RoundtripTest for TrigTest {
         // --- trig_hyperbolic: sinh, cosh, tanh, asinh ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&trig_hyperbolic::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&trig_hyperbolic::WGSL_SOURCE)
+                    .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -258,7 +259,7 @@ impl RoundtripTest for TrigTest {
         // --- trig_inv_hyperbolic: acosh, atanh ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&trig_inv_hyperbolic::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&trig_inv_hyperbolic::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,

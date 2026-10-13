@@ -144,7 +144,7 @@ impl RoundtripTest for GeometricTest {
         {
             let output_size = (N * 4 * std::mem::size_of::<f32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&geo_scalar::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&geo_scalar::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -190,7 +190,7 @@ impl RoundtripTest for GeometricTest {
         {
             let output_size = (N * 4 * std::mem::size_of::<f32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&geo_fma::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&geo_fma::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -237,7 +237,7 @@ impl RoundtripTest for GeometricTest {
             const OUTPUT_COUNT: usize = 16;
             let output_size = (OUTPUT_COUNT * 4 * std::mem::size_of::<f32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&geo_vector::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&geo_vector::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -283,7 +283,7 @@ impl RoundtripTest for GeometricTest {
             const OUTPUT_COUNT: usize = 16;
             let output_size = (OUTPUT_COUNT * 4 * std::mem::size_of::<f32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&geo_cross_reflect::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&geo_cross_reflect::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,

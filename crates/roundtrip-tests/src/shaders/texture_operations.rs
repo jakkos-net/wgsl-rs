@@ -368,7 +368,7 @@ fn render_texture_load_gpu(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &texture_load_2d::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("texture_load_pipeline_layout"));
@@ -454,7 +454,7 @@ fn render_texture_load_unfilterable_gpu(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &texture_load_2d_unfilterable::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout =
@@ -549,7 +549,7 @@ fn render_texture_sample_unfilterable_gpu(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &texture_sample_2d_unfilterable::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout =
@@ -639,7 +639,7 @@ fn render_texture_sample_gpu(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &texture_sample_2d::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("texture_sample_pipeline_layout"));
@@ -824,7 +824,7 @@ fn render_texture_sample_3d_gpu(
     let target_view = target.create_view(&wgpu::TextureViewDescriptor::default());
 
     let module = &texture_sample_3d::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout =

@@ -89,7 +89,8 @@ impl RoundtripTest for RoundingTest {
         // --- rounding_basic: ceil, floor, round, trunc ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&rounding_basic::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&rounding_basic::WGSL_SOURCE)
+                    .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -134,7 +135,8 @@ impl RoundtripTest for RoundingTest {
         // --- rounding_fract: fract, saturate ---
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&rounding_fract::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module(&rounding_fract::WGSL_SOURCE)
+                    .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
