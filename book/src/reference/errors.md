@@ -20,9 +20,9 @@ match source.wgsl_source() {
 }
 ```
 
-## `linkage::wgpu::Error`
+## `wgsl_rs_linkage_wgpu::Error`
 
-Raised by the `linkage-wgpu` feature when reflecting bind groups and pipeline layouts.
+Raised by the `wgsl-rs-linkage-wgpu` crates when reflecting bind groups and pipeline layouts.
 
 | Variant              | When                                                                |
 |----------------------|---------------------------------------------------------------------|
@@ -36,10 +36,10 @@ Raised by the `linkage-wgpu` feature when reflecting bind groups and pipeline la
 ```rust
 match source.linkage().bind_group(0) {
     Ok(group) => { /* build BindGroupLayout */ }
-    Err(linkage::wgpu::Error::NoSuchBindGroup) => {
+    Err(wgsl_rs_linkage_wgpu::Error::NoSuchBindGroup) => {
         // bind group 0 not declared in this shader
     }
-    Err(linkage::wgpu::Error::TemplateResolution) => {
+    Err(wgsl_rs_linkage_wgpu::Error::TemplateResolution) => {
         let concrete = source.instantiate(&[concrete_type])?;
         let group = concrete.linkage().bind_group(0)?;
     }

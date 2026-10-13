@@ -6,7 +6,13 @@
 |---------------------|----------|----------------------------------------------------------------------------|
 | `validation`        | Yes      | Compile-time WGSL validation of generated source                           |
 | `dispatch-runtime`  | No       | Enable runtime dispatch support                                            |
-| `linkage-wgpu`      | No       | Enable wgpu-based linkage (bind group reflection, pipeline layout)         |
+
+## `wgsl-rs-linkage-wgpu`
+
+| Feature | Default? | Description                                                          |
+|---------|----------|----------------------------------------------------------------------|
+| `v29`   | No       | Linkage compiled against wgpu 29 (module `wgsl_rs_linkage_wgpu::v29`) |
+| `v30`   | Yes      | Linkage compiled against wgpu 30 (module `wgsl_rs_linkage_wgpu::v30`, also re-exported at the crate root) |
 
 ## `wgsl-rs-layout`
 
@@ -18,6 +24,7 @@
 
 ```toml
 [dependencies]
-wgsl-rs = { version = "0.1", default-features = false, features = ["validation", "linkage-wgpu"] }
+wgsl-rs = { version = "0.1", default-features = false, features = ["validation"] }
+wgsl-rs-linkage-wgpu = "0.1" # default: latest wgpu major
 wgsl-rs-layout = { version = "0.1", features = ["doc-diagrams"] }
 ```

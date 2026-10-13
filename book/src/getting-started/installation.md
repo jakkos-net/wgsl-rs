@@ -38,7 +38,9 @@ The `validation` feature is enabled by default and pulls in [naga](https://githu
 | ------------------ | ------- | ------------------------------------------------------------------ |
 | `validation`       | on      | naga-based WGSL validation; auto-generates `__validate_wgsl` tests. |
 | `dispatch-runtime` | off     | CPU-side fragment dispatch runtime for roundtrip testing.          |
-| `linkage-wgpu`     | off     | wgpu pipeline/linkage generation from shader modules.              |
+
+wgpu linkage generation is not a cargo feature: it lives in the separate
+`wgsl-rs-linkage-wgpu` crate, compiled against each supported wgpu major.
 
 See [Cargo Features](./cargo-features.md) for details on each.
 

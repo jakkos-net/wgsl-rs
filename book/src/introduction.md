@@ -16,7 +16,7 @@ user-facing reference for writing GPU shaders with `wgsl-rs`.
    using [`Source::wgsl_source`](https://docs.rs/wgsl-rs/latest/wgsl_rs/struct.Source.html#method.wgsl_source).
 3. How do I run my shaders?
    * That's still up to you, but if your runtime is [`wgpu`](https://crates.io/crates/wgpu), then with the
-   [`linkage-wgpu`](./getting-started/cargo-features.md#linkage-wgpu) feature provided by this crate you can avoid a lot of boiler plate by having your [linkage
+   [`wgsl-rs-linkage-wgpu`](https://crates.io/crates/wgsl-rs-linkage-wgpu) crate you can avoid a lot of boiler plate by having your [linkage
    auto-generated](./linkage/overview.md#high-level-workflow).
 4. How do I test my shaders?
    * Using the usual Rust test tools. All Rust code written in a `#[wgsl_rs]` module can run on the CPU

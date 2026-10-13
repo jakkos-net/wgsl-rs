@@ -8,12 +8,35 @@ groups, and pipelines, with sizes computed per WGSL §14.4.1 (not Rust's
 
 ## Enabling linkage
 
-Linkage is gated behind the `linkage-wgpu` cargo feature:
+Linkage lives in the `wgsl-rs-linkage-wgpu` crate, separate from
+`wgsl-rs` (which stays wgpu-free). The default features give you the
+latest supported wgpu major, exposed at the crate root:
 
 ```toml
 [dependencies]
-wgsl-rs = { version = "0.1", features = ["linkage-wgpu"] }
+wgsl-rs = "0.1"
+wgsl-rs-linkage-wgpu = "0.1"
 ```
+
+Pinned to an older wgpu major? Disable the default and enable the
+matching module:
+
+```toml
+[dependencies]
+wgsl-rs-linkage-wgpu = { version = "0.1", default-features = false, features = ["v29"] }
+```
+
+```rust
+// Latest: everything at the crate root.
+use wgsl_rs_linkage_wgpu::{analyze_wgsl_module, analyze_ir_module, WgpuLinkage};
+
+// Pinned: the same API under the matching module.
+use wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module;
+```
+
+Both majors may be enabled at once (feature unification); the modules
+coexist with distinct, incompatible wgpu types, and the crate root always
+re-exports the latest.
 
 See [Cargo Features](../getting-started/cargo-features.md).
 
@@ -23,7 +46,7 @@ See [Cargo Features](../getting-started/cargo-features.md).
 renders the WGSL source via `ir::render_module`. You get one of two ways:
 
 ```rust
-use wgsl_rs::linkage::wgpu::{analyze_wgsl_module, analyze_ir_module, WgpuLinkage};
+use wgsl_rs_linkage_wgpu::{analyze_wgsl_module, analyze_ir_module, WgpuLinkage};
 
 // From a concrete (non-template) Source:
 let linkage: WgpuLinkage = analyze_wgsl_module(&my_shader::SOURCE)?;
@@ -34,10 +57,10 @@ let linkage: WgpuLinkage = analyze_ir_module(concrete_ir);
 ```
 
 `Source` and `ir::Module` both expose `generate_linkage()` — an extension
-trait method (`IrModuleExt`) re-exported via `wgsl_rs::*`:
+trait method (`IrModuleExt`) exported from the linkage crate's root:
 
 ```rust
-use wgsl_rs::*;
+use wgsl_rs_linkage_wgpu::*;
 let linkage = my_shader::SOURCE.generate_linkage()?;
 ```
 
@@ -47,10 +70,12 @@ let linkage = my_shader::SOURCE.generate_linkage()?;
 |--------|---------|-------------|
 | `wgsl_source()` | `String` | The rendered WGSL text. |
 | `shader_module(device)` | `wgpu::ShaderModule` | Compiled shader module (no `&Module` arg needed). |
-| `entry_point(name)` | `Option<&EntryPointInfo>` | Vertex/fragment/compute entry point info. |
+| `vertex_entry(name)` | `Option<&EntryPointInfo>` | Vertex entry point info. |
+| `fragment_entry(name)` | `Option<&EntryPointInfo>` | Fragment entry point info. |
+| `compute_entry(name)` | `Option<&ComputeEntryInfo>` | Compute entry point info (workgroup size). |
 | `bind_group(n)` | `Option<&BindGroupInfo>` | Bind group at `@group(n)`. |
-| `bind_groups()` | `&HashMap<u32, BindGroupInfo>` | All bind groups. |
-| `create_bind_group_named(group, device, resources)` | `wgpu::BindGroup` | Creates a bind group, caching the layout. |
+| `bind_groups` | `&BTreeMap<u32, BindGroupInfo>` | All bind groups. |
+| `create_bind_group_named(group, device, resources)` | `wgpu::BindGroup` | Creates a bind group by binding names, caching the layout. |
 | `pipeline_layout(&mut self, device, label)` | `wgpu::PipelineLayout` | Pipeline layout, lazily cached. |
 | `buffer(name)` | `Option<&BufferDescriptorInfo>` | Find a buffer by its binding name. |
 
@@ -66,29 +91,35 @@ See [Bind Groups & Buffers](./bind-groups.md) and
 5. Create the pipeline layout (cached) and the render/compute pipeline.
 
 ```rust
-use wgsl_rs::*;
+use wgsl_rs_linkage_wgpu::*;
 
-let mut linkage = my_shader::SOURCE.generate_linkage()?;
+let mut linkage = analyze_wgsl_module(&my_shader::SOURCE)?;
 let shader = linkage.shader_module(&device);
 
 let frame_bg = linkage.create_bind_group_named(0, &device, &[
     ("FRAME", frame_buffer.as_entire_binding()),
 ])?;
 
-let layout = linkage.pipeline_layout(&mut self, &device, Some("main_layout"));
+let layout = linkage.pipeline_layout(&device, Some("main_layout"));
 let pipeline = device.create_render_pipeline(wgpu::RenderPipelineDescriptor {
     label: Some("main"),
     layout: Some(&layout),
-    vertex: linkage.entry_point("vs").unwrap().vertex_state(&device, &[], &[]),
-    fragment: Some(wgpu::FragmentState {
-        module: &shader,
-        entry_point: linkage.entry_point("fs").unwrap().name(),
-        targets: &[Some(wgpu::TextureFormat::Bgra8Unorm.into())],
-    }),
+    vertex: linkage.vertex_entry("vs_main").unwrap().vertex_state(&shader),
+    fragment: Some(
+        linkage.fragment_entry("fs_main").unwrap().fragment_state(
+            &shader,
+            &[Some(wgpu::ColorTargetState {
+                format: surface_format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::all(),
+            })],
+        ),
+    ),
     primitive: wgpu::PrimitiveState::default(),
     depth_stencil: None,
     multisample: wgpu::MultisampleState::default(),
-    multiview: None,
+    multiview_mask: None,
+    cache: None,
 });
 ```
 
@@ -107,3 +138,19 @@ underlying trait machinery.
 returned wgpu types are `Arc`-backed, so cloning is cheap. You typically keep
 one `WgpuLinkage` per shader and call the `&mut self` methods once at
 pipeline-construction time.
+
+## Migrating from the `linkage-wgpu` feature
+
+Earlier betas shipped linkage inside `wgsl-rs` behind a `linkage-wgpu`
+cargo feature. It now lives in its own crates so users on different wgpu
+majors can each get matching types. To migrate:
+
+1. Remove the `linkage-wgpu` feature from your `wgsl-rs` dependency.
+2. Add a dependency on `wgsl-rs-linkage-wgpu` (default features = the
+   latest wgpu major; enable the `vNN` feature matching your pinned
+   major otherwise).
+3. Replace `wgsl_rs::linkage::wgpu::X` with `wgsl_rs_linkage_wgpu::X`
+   (or `wgsl_rs_linkage_wgpu::vNN::X` when pinned).
+
+`wgsl-rs` itself no longer depends on wgpu at all; everything else
+(`#[wgsl]`, `std`, dispatch, validation) is unchanged.
