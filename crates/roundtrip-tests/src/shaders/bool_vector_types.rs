@@ -129,7 +129,7 @@ impl RoundtripTest for BoolVectorTypesTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bool_vec_annotations::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&bool_vec_annotations::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {

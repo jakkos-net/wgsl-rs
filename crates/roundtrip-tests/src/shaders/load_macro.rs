@@ -49,7 +49,7 @@ impl RoundtripTest for LoadMacroTest {
         let epsilon = 0.0;
 
         let mut linkage =
-            wgsl_rs::linkage::wgpu::analyze_wgsl_module(&load_copy::WGSL_SOURCE).unwrap();
+            wgsl_rs_linkage_wgpu::analyze_wgsl_module(&load_copy::WGSL_SOURCE).unwrap();
         let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
             device,
             queue,

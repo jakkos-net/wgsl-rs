@@ -1,11 +1,11 @@
 //! Errors produced by [`Source`]-level operations.
 //!
 //! These errors are about the *source* (the spec the user wrote) —
-//! distinct from the `crate::linkage::wgpu::Error` type, which is about
-//! producing a wgpu `WgpuLinkage` from an already-analyzed `ir::Module`.
-//! (That error type only exists when the `linkage-wgpu` feature is
-//! enabled, so it's referenced here as a plain code span rather than an
-//! intra-doc link to keep default-feature doc builds warning-free.)
+//! distinct from the `wgsl_rs_linkage_wgpu::Error` type, which is about
+//! producing a wgpu `WgpuLinkage` from an already-analyzed `ir::Module`
+//! in the `wgsl-rs-linkage-wgpu` crates. (That error type lives outside
+//! this crate, so it's referenced here as a plain code span rather than
+//! an intra-doc link to keep doc builds warning-free.)
 
 use crate::Source;
 

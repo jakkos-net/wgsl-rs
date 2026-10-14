@@ -1052,7 +1052,7 @@ fn fill_gpu_depth2d(device: &wgpu::Device, queue: &wgpu::Queue) -> wgpu::Texture
     let depth_view = depth_tex.create_view(&wgpu::TextureViewDescriptor::default());
 
     let mut linkage =
-        wgsl_rs::linkage::wgpu::analyze_wgsl_module(&fill_depth_2d::WGSL_SOURCE).unwrap();
+        wgsl_rs_linkage_wgpu::analyze_wgsl_module(&fill_depth_2d::WGSL_SOURCE).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("fill_depth_layout"));
@@ -1126,7 +1126,7 @@ fn fill_gpu_depth2d_array(device: &wgpu::Device, queue: &wgpu::Queue) -> wgpu::T
     });
 
     let mut linkage =
-        wgsl_rs::linkage::wgpu::analyze_wgsl_module(&fill_depth_2d::WGSL_SOURCE).unwrap();
+        wgsl_rs_linkage_wgpu::analyze_wgsl_module(&fill_depth_2d::WGSL_SOURCE).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("fill_depth_array_layout"));
@@ -1220,7 +1220,7 @@ fn fill_gpu_depth_cube(
     });
 
     let mut linkage =
-        wgsl_rs::linkage::wgpu::analyze_wgsl_module(&fill_depth_cube_face::WGSL_SOURCE).unwrap();
+        wgsl_rs_linkage_wgpu::analyze_wgsl_module(&fill_depth_cube_face::WGSL_SOURCE).unwrap();
     let module = linkage.shader_module(device);
     let pipeline_layout = linkage.pipeline_layout(device, Some("fill_depth_cube_layout"));
 
@@ -1445,7 +1445,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
             });
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&tex2d_variants::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&tex2d_variants::WGSL_SOURCE).unwrap();
             let module = linkage.shader_module(device);
             let pipeline_layout = linkage.pipeline_layout(device, Some("advanced_tex2d_variants"));
             let bg = linkage
@@ -1509,7 +1509,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 ..Default::default()
             });
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&tex2d_gather_variants::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&tex2d_gather_variants::WGSL_SOURCE)
                     .unwrap();
             let module = linkage.shader_module(device);
             let pipeline_layout = linkage.pipeline_layout(device, Some("advanced_tex2d_gather"));
@@ -1574,7 +1574,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                 ..Default::default()
             });
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(
                 &tex2d_gather_integer_variants::WGSL_SOURCE,
             )
             .unwrap();
@@ -1647,7 +1647,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                 ..Default::default()
             });
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(
                 &tex2d_array_gather_variants::WGSL_SOURCE,
             )
             .unwrap();
@@ -1719,7 +1719,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 ..Default::default()
             });
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&tex2d_array_variants::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&tex2d_array_variants::WGSL_SOURCE)
                     .unwrap();
             let module = linkage.shader_module(device);
             let pipeline_layout =
@@ -1791,7 +1791,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
             });
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&tex_cube_gather_variants::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&tex_cube_gather_variants::WGSL_SOURCE)
                     .unwrap();
             let module = linkage.shader_module(device);
             let pipeline_layout = linkage.pipeline_layout(device, Some("advanced_cube_gather"));
@@ -1868,7 +1868,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 ..Default::default()
             });
 
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(
                 &tex_cube_array_gather_variants::WGSL_SOURCE,
             )
             .unwrap();
@@ -1947,7 +1947,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 ..Default::default()
             });
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&depth2d_compare_variants::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&depth2d_compare_variants::WGSL_SOURCE)
                     .unwrap();
             let module = linkage.shader_module(device);
             let pipeline_layout = linkage.pipeline_layout(device, Some("advanced_depth2d_compare"));
@@ -2025,7 +2025,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 compare: Some(wgpu::CompareFunction::LessEqual),
                 ..Default::default()
             });
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(
                 &depth2d_array_compare_variants::WGSL_SOURCE,
             )
             .unwrap();
@@ -2112,10 +2112,9 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                 ..Default::default()
             });
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
-                &depth_cube_gather_variants::WGSL_SOURCE,
-            )
-            .unwrap();
+            let mut linkage =
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&depth_cube_gather_variants::WGSL_SOURCE)
+                    .unwrap();
             let module = linkage.shader_module(device);
             let pipeline_layout =
                 linkage.pipeline_layout(device, Some("advanced_depth_cube_gather"));
@@ -2204,7 +2203,7 @@ impl RoundtripTest for AdvancedTextureOperationsTest {
                 compare: Some(wgpu::CompareFunction::LessEqual),
                 ..Default::default()
             });
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(
                 &depth_cube_gather_compare_variants::WGSL_SOURCE,
             )
             .unwrap();

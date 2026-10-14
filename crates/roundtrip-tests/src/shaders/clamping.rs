@@ -80,7 +80,7 @@ impl RoundtripTest for ClampingTest {
         {
             let epsilon = 0.0;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&clamp_basic::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&clamp_basic::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,
@@ -126,7 +126,7 @@ impl RoundtripTest for ClampingTest {
         {
             let epsilon = 1e-5;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&clamp_interp::WGSL_SOURCE).unwrap();
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&clamp_interp::WGSL_SOURCE).unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
                 queue,

@@ -16,6 +16,7 @@ pub fn create_device() -> Option<(wgpu::Device, wgpu::Queue)> {
         power_preference: wgpu::PowerPreference::default(),
         compatible_surface: None,
         force_fallback_adapter: false,
+        apply_limit_buckets: false,
     }))
     .ok()?;
 
@@ -120,7 +121,7 @@ pub fn read_rgba32float_texture(
         .expect("channel recv failed")
         .expect("buffer mapping failed");
 
-    let data = staging.slice(..).get_mapped_range();
+    let data = staging.slice(..).get_mapped_range().unwrap();
     let mut pixels = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
         let row_offset = (y * bytes_per_row) as usize;
@@ -136,7 +137,7 @@ pub fn read_rgba32float_texture(
 }
 
 /// Parameters for a GPU compute dispatch driven by
-/// [`wgsl_rs::linkage::wgpu::WgpuLinkage`].
+/// [`wgsl_rs_linkage_wgpu::WgpuLinkage`].
 ///
 /// The shader source, bind group layout, and entry point are all
 /// derived from the supplied linkage; the caller only provides buffers
@@ -147,7 +148,7 @@ pub fn read_rgba32float_texture(
 pub struct GpuComputeParamsLinked<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
-    pub linkage: &'a mut wgsl_rs::linkage::wgpu::WgpuLinkage,
+    pub linkage: &'a mut wgsl_rs_linkage_wgpu::WgpuLinkage,
     pub entry: &'a str,
     pub input_data: &'a [u8],
     pub output_size: u64,
@@ -176,7 +177,7 @@ pub fn run_gpu_compute_linked(params: &mut GpuComputeParamsLinked<'_>) -> Vec<u8
     // a `&ComputeEntryInfo` whose `name` is `Cow<'static, str>`. We clone
     // it to an owned `String` so the immutable borrow of `linkage` ends
     // before the mutable `pipeline_layout` call below.
-    let entry_info: &wgsl_rs::linkage::wgpu::ComputeEntryInfo = linkage
+    let entry_info: &wgsl_rs_linkage_wgpu::ComputeEntryInfo = linkage
         .compute_entry(entry)
         .expect("entry point not found in linkage");
     let entry_name: String = entry_info.name.to_string();
@@ -275,7 +276,7 @@ pub fn run_gpu_compute_linked(params: &mut GpuComputeParamsLinked<'_>) -> Vec<u8
         .expect("channel recv failed")
         .expect("buffer mapping failed");
 
-    let data = staging.slice(..).get_mapped_range();
+    let data = staging.slice(..).get_mapped_range().unwrap();
     let result = data[..output_size as usize].to_vec();
     drop(data);
     staging.unmap();

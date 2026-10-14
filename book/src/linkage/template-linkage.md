@@ -27,7 +27,7 @@ The correct flow is:
 3. Pass the concrete IR to `analyze_ir_module`.
 
 ```rust
-use wgsl_rs::linkage::wgpu::analyze_ir_module;
+use wgsl_rs_linkage_wgpu::analyze_ir_module;
 use wgsl_rs::*;
 
 let template: &Source = &renderer::SOURCE;

@@ -2,7 +2,7 @@ use clap::Parser;
 
 mod examples;
 use examples::*;
-use wgsl_rs::linkage::wgpu::{IrModuleExt, analyze_wgsl_module};
+use wgsl_rs_linkage_wgpu::{IrModuleExt, analyze_wgsl_module};
 
 #[derive(Parser)]
 #[command(
@@ -139,6 +139,7 @@ fn build_linkage() {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             }))
             .expect("Failed to find an appropriate adapter");
 
@@ -169,7 +170,7 @@ fn build_linkage() {
     }
 
     impl HelloTriangle {
-        fn new(wgpu_stuff: &WgpuStuff) -> Result<Self, wgsl_rs::linkage::wgpu::Error> {
+        fn new(wgpu_stuff: &WgpuStuff) -> Result<Self, wgsl_rs_linkage_wgpu::Error> {
             let device = &wgpu_stuff.device;
             let queue = &wgpu_stuff.queue;
             let frame = 0u32;
@@ -380,7 +381,7 @@ fn build_linkage() {
                         }
 
                         let index = queue.submit(Some(encoder.finish()));
-                        texture.present();
+                        queue.present(texture);
 
                         // TODO: maybe do this elsewhere?
                         device

@@ -75,7 +75,7 @@ impl RoundtripTest for LiteralSuffixTest {
         let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
         let mut linkage =
-            wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bare_literals::WGSL_SOURCE).unwrap();
+            wgsl_rs_linkage_wgpu::analyze_wgsl_module(&bare_literals::WGSL_SOURCE).unwrap();
         let gpu_output = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
             device,
             queue,
@@ -161,7 +161,7 @@ impl RoundtripTest for LoopVarTypeTest {
         let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
         let mut linkage =
-            wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bare_loop_vars::WGSL_SOURCE).unwrap();
+            wgsl_rs_linkage_wgpu::analyze_wgsl_module(&bare_loop_vars::WGSL_SOURCE).unwrap();
         let gpu_output = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
             device,
             queue,

@@ -212,7 +212,7 @@ impl RoundtripTest for VectorEqualityTest {
                 let input_bytes = bytemuck::cast_slice::<f32, u8>(&inputs);
 
                 let mut linkage =
-                    wgsl_rs::linkage::wgpu::analyze_wgsl_module(&$mod_name::WGSL_SOURCE).unwrap();
+                    wgsl_rs_linkage_wgpu::analyze_wgsl_module(&$mod_name::WGSL_SOURCE).unwrap();
                 let gpu_output =
                     harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                         device,

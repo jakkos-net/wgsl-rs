@@ -1,0 +1,23 @@
+[package]
+name = "wgsl-rs-linkage-wgpu"
+version = "0.1.0-beta.4"
+edition = "2024"
+description = "wgpu linkage generation for wgsl-rs shader modules; defaults to the latest supported wgpu major, with feature-gated modules for older majors."
+license = "MIT"
+repository = "https://github.com/schell/wgsl-rs"
+rust-version = "1.87"
+keywords = ["wgsl", "wgpu", "shader", "gpu"]
+categories = ["graphics", "game-development"]
+
+[features]
+default = ["v30"]
+v29 = ["dep:wgsl-rs-linkage-wgpu-v29"]
+v30 = ["dep:wgsl-rs-linkage-wgpu-v30"]
+
+[dependencies]
+wgsl-rs-linkage-wgpu-v29 = { version = "0.1.0-beta.4", path = "../wgsl-rs-linkage-wgpu-v29", optional = true }
+wgsl-rs-linkage-wgpu-v30 = { version = "0.1.0-beta.4", path = "../wgsl-rs-linkage-wgpu-v30", optional = true }
+
+[package.metadata.docs.rs]
+# Document both the v29 and v30 modules.
+all-features = true

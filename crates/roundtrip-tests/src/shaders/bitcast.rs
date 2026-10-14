@@ -125,7 +125,7 @@ impl RoundtripTest for BitcastTest {
         {
             let output_size = (N * 4 * std::mem::size_of::<u32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bitcast_scalar_roundtrip::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&bitcast_scalar_roundtrip::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -172,7 +172,7 @@ impl RoundtripTest for BitcastTest {
             const VEC4_COUNT: usize = 16;
             let output_size = (VEC4_COUNT * 4 * std::mem::size_of::<u32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&bitcast_vec4_roundtrip::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&bitcast_vec4_roundtrip::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,

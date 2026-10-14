@@ -171,7 +171,7 @@ fn push_u32_result(results: &mut Vec<ComparisonResult>, name: &str, gpu: &[u32],
 fn dispatch_u32(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    linkage: &mut wgsl_rs::linkage::wgpu::WgpuLinkage,
+    linkage: &mut wgsl_rs_linkage_wgpu::WgpuLinkage,
     input: &[u32],
     output_len: usize,
     workgroup_count: (u32, u32, u32),
@@ -209,7 +209,7 @@ impl RoundtripTest for AtomicOperationsTest {
 
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&atomic_u32_scalar_ops::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&atomic_u32_scalar_ops::WGSL_SOURCE)
                     .unwrap();
             let gpu = dispatch_u32(device, queue, &mut linkage, &input, 16, (1, 1, 1));
 
@@ -226,7 +226,7 @@ impl RoundtripTest for AtomicOperationsTest {
 
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&atomic_i32_scalar_ops::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&atomic_i32_scalar_ops::WGSL_SOURCE)
                     .unwrap();
             let gpu = dispatch_u32(device, queue, &mut linkage, &input, 16, (1, 1, 1));
 
@@ -243,7 +243,7 @@ impl RoundtripTest for AtomicOperationsTest {
 
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&atomic_u32_contended_add::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&atomic_u32_contended_add::WGSL_SOURCE)
                     .unwrap();
             let gpu = dispatch_u32(device, queue, &mut linkage, &input, WG_SIZE, (1, 1, 1));
 
@@ -260,7 +260,7 @@ impl RoundtripTest for AtomicOperationsTest {
 
         {
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&atomic_i32_contended_add::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&atomic_i32_contended_add::WGSL_SOURCE)
                     .unwrap();
             let gpu = dispatch_u32(device, queue, &mut linkage, &input, WG_SIZE, (1, 1, 1));
 

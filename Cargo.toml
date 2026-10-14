@@ -11,6 +11,9 @@ members = [
   "crates/wgsl-rs-ir",
   "crates/wgsl-rs-layout",
   "crates/wgsl-rs-layout-macros",
+  "crates/wgsl-rs-linkage-wgpu",
+  "crates/wgsl-rs-linkage-wgpu-v29",
+  "crates/wgsl-rs-linkage-wgpu-v30",
   "crates/wgsl-rs-macros",
   "crates/xtask"
 ]
@@ -24,7 +27,7 @@ futures = "0.3"
 glam = "0.30.9"
 itertools = "0.14.0"
 log = "0.4"
-naga = { version = "29", features = ["wgsl-in", "wgsl-out"] }
+naga = { version = "30", features = ["wgsl-in", "wgsl-out"] }
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -36,5 +39,5 @@ quote = "1.0"
 snafu = "0.8.9"
 syn = { version = "2.0", features = ["full", "printing", "extra-traits", "visit-mut"] }
 bytemuck = { version = "1", features = ["derive"] }
-wgpu = "29"
+wgpu = "30"
 winit = "0.30"

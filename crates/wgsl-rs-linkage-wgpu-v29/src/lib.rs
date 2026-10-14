@@ -1,5 +1,12 @@
 //! Runtime wgpu linkage analysis for WGSL modules.
 //!
+//! This file is the canonical linkage implementation, compiled by each
+//! version crate (`wgsl-rs-linkage-wgpu-v30`, `wgsl-rs-linkage-wgpu-v29`,
+//! ...) against its pinned `wgpu`. The version crates keep identical
+//! copies of this file; `cargo xtask ci linkage-matrix` fails if they
+//! drift. A version crate forks its copy only when a wgpu major
+//! actually diverges from this API.
+//!
 //! Given an [`ir::Module`] (produced by a `#[wgsl]` source's
 //! `WGSL_SOURCE.ir_constructor`, or by the macro-emitted
 //! `instantiate::<...>()` function for templates), this module extracts
@@ -25,9 +32,12 @@
 //! # Example
 //!
 //! ```ignore
-//! use wgsl_rs::linkage::wgpu;
+//! // Import the linkage API matching your wgpu major: the facade's
+//! // root (`wgsl-rs-linkage-wgpu`) by default, or its `v29` module
+//! // path when pinned.
+//! use wgsl_rs_linkage_wgpu as wgpu_linkage;
 //!
-//! let linkage = wgpu::analyze_wgsl_module(&hello_triangle::WGSL_SOURCE).unwrap();
+//! let linkage = wgpu_linkage::analyze_wgsl_module(&hello_triangle::WGSL_SOURCE).unwrap();
 //! let shader_module = linkage.shader_module(&device);
 //! let bg_layout = linkage.bind_group(0).unwrap().layout(&device);
 //! let bg = linkage.bind_group(0).unwrap().create(
@@ -45,7 +55,11 @@ use std::{
 use snafu::prelude::*;
 use wgsl_rs_ir as ir;
 
-use crate::Source;
+use wgsl_rs::Source;
+
+// Re-export the pinned wgpu so linkage consumers can import every type
+// the API produces from one path.
+pub use wgpu;
 
 /// Errors thrown by the WGPU linkage module.
 #[derive(Snafu, Debug)]
@@ -101,10 +115,10 @@ pub enum Error {
     },
 }
 
-impl From<crate::SourceError<'_>> for Error {
-    fn from(err: crate::SourceError<'_>) -> Self {
+impl From<wgsl_rs::SourceError<'_>> for Error {
+    fn from(err: wgsl_rs::SourceError<'_>) -> Self {
         match err {
-            crate::SourceError::TemplateWgsl {
+            wgsl_rs::SourceError::TemplateWgsl {
                 uninstantiated_source,
             } => Error::TemplateResolution {
                 template_name: format!("<source {}>", uninstantiated_source.name),
@@ -115,7 +129,7 @@ impl From<crate::SourceError<'_>> for Error {
                     .collect(),
                 available: Vec::new(),
             },
-            crate::SourceError::TemplateNotFound {
+            wgsl_rs::SourceError::TemplateNotFound {
                 template_name,
                 mangled_type_args,
                 available_templates,
@@ -124,7 +138,7 @@ impl From<crate::SourceError<'_>> for Error {
                 mangled_type_args,
                 available: available_templates,
             },
-            crate::SourceError::AmbiguousTemplate {
+            wgsl_rs::SourceError::AmbiguousTemplate {
                 template_name,
                 mangled_type_args,
                 matching_source_names,
@@ -150,7 +164,7 @@ pub struct WgpuLinkage {
 
     /// The concrete, fully-assembled IR the linkage was built from. This
     /// is the IR rendered by [`Self::wgsl_source`] to produce the shader
-    /// source's WGSL text. For sources built from [`crate::Source`] it
+    /// source's WGSL text. For sources built from [`wgsl_rs::Source`] it
     /// is the result of flattening imports and template instantiations;
     /// for modules built from [`ir::Module`] (e.g. an instantiated
     /// template) it is that module directly. Always concrete: no
@@ -503,17 +517,18 @@ impl WgpuLinkage {
 /// [`wgsl_rs_ir::Module`] lives in a separate crate and so cannot have
 /// inherent methods that reference `wgsl-rs` types. The methods that
 /// need `WgpuLinkage` or naga validation live here instead. The trait
-/// is re-exported from `wgsl_rs::*` so `m.generate_linkage()` works
-/// after `use wgsl_rs;` without an explicit import.
+/// is exported from this crate's root, so `m.generate_linkage()` works
+/// after importing it, without an explicit `use` of the trait's defining
+/// module.
 pub trait IrModuleExt {
     /// Builds a [`WgpuLinkage`] from this concrete IR module.
     ///
-    /// Equivalent to [`analyze_ir_module`](self).
+    /// Equivalent to the free function [`analyze_ir_module`].
     fn generate_linkage(&self) -> WgpuLinkage;
 
     /// Validates the WGSL source rendered from this IR module using naga.
     ///
-    /// Equivalent to the free function [`crate::validate_wgsl_source`]
+    /// Equivalent to the free function [`wgsl_rs::validate_wgsl_source`]
     /// called on the output of [`wgsl_rs_ir::Module::wgsl_source`].
     ///
     /// Only available with the `validation` feature enabled.
@@ -528,7 +543,7 @@ impl IrModuleExt for wgsl_rs_ir::Module {
 
     #[cfg(feature = "validation")]
     fn validate(&self) -> Result<(), String> {
-        crate::validate_wgsl_source(&self.wgsl_source())
+        wgsl_rs::validate_wgsl_source(&self.wgsl_source())
     }
 }
 
@@ -802,7 +817,7 @@ pub struct BufferDescriptorInfo {
     ///
     /// Here because it's useful for users to see the type from the runtime/CPU
     /// side.
-    pub ty: crate::ir::Type,
+    pub ty: ir::Type,
 }
 
 impl BufferDescriptorInfo {
@@ -1384,14 +1399,14 @@ fn collect_refs_in_expr(refs: &mut FnRefs, expr: &ir::Expr) {
 /// `ir::Module` to [`analyze_ir_module`].
 ///
 /// **Fallible.** Returns
-/// [`SourceError::TemplateWgsl`](crate::SourceError::TemplateWgsl)-style errors
-/// for template sources (caller must `instantiate` first) and
+/// [`SourceError::TemplateWgsl`](wgsl_rs::SourceError::TemplateWgsl)-style
+/// errors for template sources (caller must `instantiate` first) and
 /// [`Error::TemplateResolution`] if a cross-source template instantiation
 /// is ambiguous. Callers can `?` this on a possibly-template source, or
 /// `unwrap` on a known concrete one.
 pub fn analyze_wgsl_module(wgsl_source: &Source) -> Result<WgpuLinkage, Error> {
     if wgsl_source.is_template() {
-        return Err(crate::SourceError::TemplateWgsl {
+        return Err(wgsl_rs::SourceError::TemplateWgsl {
             uninstantiated_source: wgsl_source,
         }
         .into());

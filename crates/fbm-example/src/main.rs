@@ -12,7 +12,7 @@ use std::{sync::Arc, time::Instant};
 
 use futures::executor::block_on;
 use shader::fbm_shader;
-use wgsl_rs::linkage::wgpu::analyze_wgsl_module;
+use wgsl_rs_linkage_wgpu::analyze_wgsl_module;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -38,6 +38,7 @@ impl GpuContext {
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
+            apply_limit_buckets: false,
         }))
         .expect("Failed to find an appropriate adapter");
 
@@ -76,7 +77,7 @@ struct FbmPipeline {
 }
 
 impl FbmPipeline {
-    fn new(gpu: &GpuContext) -> Result<Self, wgsl_rs::linkage::wgpu::Error> {
+    fn new(gpu: &GpuContext) -> Result<Self, wgsl_rs_linkage_wgpu::Error> {
         let device = &gpu.device;
 
         // Runtime IR-based wgpu linkage analysis (issue #120).
@@ -269,7 +270,7 @@ impl AppInner {
         }
 
         let index = queue.submit(Some(encoder.finish()));
-        texture.present();
+        queue.present(texture);
 
         self.gpu
             .device

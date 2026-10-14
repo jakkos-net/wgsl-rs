@@ -463,8 +463,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_f32_scalar::WGSL_SOURCE)
-                    .unwrap();
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_f32_scalar::WGSL_SOURCE).unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                     device,
@@ -511,8 +510,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_i32_scalar::WGSL_SOURCE)
-                    .unwrap();
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_i32_scalar::WGSL_SOURCE).unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                     device,
@@ -559,8 +557,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_u32_scalar::WGSL_SOURCE)
-                    .unwrap();
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_u32_scalar::WGSL_SOURCE).unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                     device,
@@ -607,7 +604,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec2f_scalar::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec2f_scalar::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
@@ -655,7 +652,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec4f_scalar::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec4f_scalar::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
@@ -703,7 +700,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec4i_scalar::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec4i_scalar::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
@@ -751,7 +748,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec4u_scalar::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec4u_scalar::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
@@ -799,7 +796,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec4f_vec4b::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec4f_vec4b::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
@@ -847,7 +844,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec4i_vec4b::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec4i_vec4b::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
@@ -895,7 +892,7 @@ impl RoundtripTest for SelectOperationsTest {
             let input_bytes = bytemuck::cast_slice::<u32, u8>(&inputs);
 
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&select_vec4u_vec4b::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&select_vec4u_vec4b::WGSL_SOURCE)
                     .unwrap();
             let gpu_output =
                 harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {

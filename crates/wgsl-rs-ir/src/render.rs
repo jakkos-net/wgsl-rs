@@ -369,10 +369,7 @@ fn write_struct(w: &mut Writer, s: &ItemStruct) {
     let n = renderable.len();
     for (i, f) in renderable.iter().enumerate() {
         w.start_line();
-        for io in &f.inter_stage_io {
-            write_inter_stage_io(w, io);
-            w.space();
-        }
+        write_inter_stage_io_attrs(w, &f.inter_stage_io, &f.ty);
         w.write(&f.name);
         w.write(": ");
         write_type(w, &f.ty);
@@ -427,10 +424,7 @@ fn write_fn(w: &mut Writer, f: &ItemFn, override_name: Option<&str>) {
         w.indent += 1;
         for arg in f.inputs.iter() {
             w.start_line();
-            for io in &arg.inter_stage_io {
-                write_inter_stage_io(w, io);
-                w.space();
-            }
+            write_inter_stage_io_attrs(w, &arg.inter_stage_io, &arg.ty);
             w.write(&arg.name);
             w.write(": ");
             write_type(w, &arg.ty);
@@ -444,10 +438,7 @@ fn write_fn(w: &mut Writer, f: &ItemFn, override_name: Option<&str>) {
         let _ = n;
     } else {
         for (i, arg) in f.inputs.iter().enumerate() {
-            for io in &arg.inter_stage_io {
-                write_inter_stage_io(w, io);
-                w.space();
-            }
+            write_inter_stage_io_attrs(w, &arg.inter_stage_io, &arg.ty);
             w.write(&arg.name);
             w.write(": ");
             write_type(w, &arg.ty);
@@ -462,6 +453,15 @@ fn write_fn(w: &mut Writer, f: &ItemFn, override_name: Option<&str>) {
         ReturnType::Type { annotation, ty } => {
             w.write(" -> ");
             write_return_annotation(w, annotation);
+            // Integer-typed `@location` returns (vertex outputs) must be
+            // declared `@interpolate(flat)`.
+            if matches!(
+                annotation,
+                ReturnTypeAnnotation::Location(_) | ReturnTypeAnnotation::DefaultLocation
+            ) && is_integer_io_type(ty)
+            {
+                w.write("@interpolate(flat) ");
+            }
             write_type(w, ty);
         }
     }
@@ -487,6 +487,43 @@ fn write_return_annotation(w: &mut Writer, ann: &ReturnTypeAnnotation) {
         ReturnTypeAnnotation::DefaultLocation => {
             w.write("@location(0) ");
         }
+    }
+}
+
+/// Returns true if `ty` is an integer scalar or vector. WGSL §13.3.1.4
+/// requires user-defined vertex outputs and fragment inputs of integer
+/// type to always be declared `@interpolate(flat)`. Since wgpu 30 /
+/// naga 30 no longer imply flat for integer IO, the renderer emits the
+/// attribute explicitly wherever the source does not provide one.
+fn is_integer_io_type(ty: &Type) -> bool {
+    matches!(
+        ty,
+        Type::Scalar(ScalarType::I32 | ScalarType::U32)
+            | Type::Vector {
+                scalar_ty: Some(ScalarType::I32 | ScalarType::U32),
+                ..
+            }
+    )
+}
+
+/// Writes a declaration's inter-stage IO attributes, each followed by a
+/// space, appending an explicit `@interpolate(flat)` when an
+/// integer-typed `@location` declaration carries no explicit
+/// interpolation.
+fn write_inter_stage_io_attrs(w: &mut Writer, io: &[InterStageIo], ty: &Type) {
+    for attr in io {
+        write_inter_stage_io(w, attr);
+        w.space();
+    }
+    let has_location = io
+        .iter()
+        .any(|attr| matches!(attr, InterStageIo::Location(_)));
+    let has_interpolation = io
+        .iter()
+        .any(|attr| matches!(attr, InterStageIo::Interpolate(_)));
+    if has_location && !has_interpolation && is_integer_io_type(ty) {
+        w.write("@interpolate(flat)");
+        w.space();
     }
 }
 
@@ -1502,6 +1539,134 @@ mod tests {
         assert!(
             items_need_tier1_extension(&module.items),
             "Expected tier-1 detection for R16float format in impl method param"
+        );
+    }
+
+    /// Renders a declaration's inter-stage IO attributes for assertion.
+    /// Attribute emission never spans lines, so the current line holds
+    /// the full output.
+    fn render_io_attrs(io: &[InterStageIo], ty: &Type) -> String {
+        let mut w = Writer::new();
+        write_inter_stage_io_attrs(&mut w, io, ty);
+        std::mem::take(&mut w.cur)
+    }
+
+    /// Integer-typed `@location` declarations gain an explicit
+    /// `@interpolate(flat)` when the user specified none: WGSL §13.3.1.4
+    /// requires it, and naga 30 / wgpu 30 no longer imply it.
+    #[test]
+    fn renders_flat_for_integer_location() {
+        let io = &[InterStageIo::Location(1)];
+        for ty in [
+            Type::Scalar(ScalarType::I32),
+            Type::Scalar(ScalarType::U32),
+            Type::Vector {
+                elements: 2,
+                scalar_ty: Some(ScalarType::I32),
+            },
+            Type::Vector {
+                elements: 4,
+                scalar_ty: Some(ScalarType::U32),
+            },
+        ] {
+            let out = render_io_attrs(io, &ty);
+            assert!(
+                out.contains("@interpolate(flat)"),
+                "integer location should carry explicit flat, got: {out}"
+            );
+        }
+    }
+
+    /// Float-typed locations keep the default interpolation.
+    #[test]
+    fn renders_no_flat_for_float_location() {
+        let io = &[InterStageIo::Location(0)];
+        for ty in [
+            Type::Scalar(ScalarType::F32),
+            Type::Vector {
+                elements: 3,
+                scalar_ty: Some(ScalarType::F32),
+            },
+        ] {
+            let out = render_io_attrs(io, &ty);
+            assert!(
+                !out.contains("@interpolate"),
+                "float location should keep default interpolation, got: {out}"
+            );
+        }
+    }
+
+    /// An explicit `#[interpolate]` is respected, never duplicated or
+    /// overridden.
+    #[test]
+    fn renders_no_duplicate_flat_when_explicit() {
+        let io = &[
+            InterStageIo::Location(0),
+            InterStageIo::Interpolate(crate::types::Interpolate {
+                ty: crate::types::InterpolationType::Flat,
+                sampling: None,
+            }),
+        ];
+        let ty = Type::Scalar(ScalarType::U32);
+        let out = render_io_attrs(io, &ty);
+        assert_eq!(
+            out.matches("@interpolate").count(),
+            1,
+            "explicit interpolation must not be duplicated, got: {out}"
+        );
+    }
+
+    /// Integer builtins carry no interpolation: `@interpolate` may only
+    /// be applied to declarations that have a `@location` attribute.
+    #[test]
+    fn renders_no_flat_for_builtin() {
+        let io = &[InterStageIo::BuiltIn(crate::types::BuiltIn::InstanceIndex)];
+        let ty = Type::Scalar(ScalarType::U32);
+        assert!(!render_io_attrs(io, &ty).contains("@interpolate"));
+    }
+
+    /// Integer-typed `@location` *return* annotations (vertex outputs)
+    /// also gain explicit flat. This exercises the return-type branch in
+    /// `write_fn`, which is separate code from
+    /// [`write_inter_stage_io_attrs`].
+    #[test]
+    fn renders_flat_for_integer_location_return() {
+        let fn_with = |annotation, ty| {
+            Item::Fn(crate::types::ItemFn {
+                type_params: vec![],
+                const_params: vec![],
+                fn_attrs: crate::types::FnAttrs::Vertex,
+                name: "vtx_main".into(),
+                inputs: vec![],
+                return_type: ReturnType::Type { annotation, ty },
+                block: crate::types::Block { stmts: vec![] },
+                attrs: vec![],
+            })
+        };
+        let module = |annotation, ty| Module {
+            name: "test",
+            items: vec![fn_with(annotation, ty)],
+            attrs: vec![],
+        };
+
+        for annotation in [
+            ReturnTypeAnnotation::Location(1),
+            ReturnTypeAnnotation::DefaultLocation,
+        ] {
+            let src = render_module(&module(annotation, Type::Scalar(ScalarType::U32)));
+            assert!(
+                src.contains("@location(") && src.contains("@interpolate(flat) u32"),
+                "integer location return must carry explicit flat, got:\n{src}"
+            );
+        }
+
+        let src = render_module(&module(
+            ReturnTypeAnnotation::Location(0),
+            Type::Scalar(ScalarType::F32),
+        ));
+        assert!(
+            !src.contains("@interpolate"),
+            "float location return keeps default interpolation, got:\n{src}"
         );
     }
 }

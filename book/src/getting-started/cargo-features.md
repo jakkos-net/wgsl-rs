@@ -1,6 +1,6 @@
 # Cargo Features
 
-`wgsl-rs` exposes three cargo features. Only `validation` is on by default.
+`wgsl-rs` exposes two cargo features, and both are on by default.
 
 ## `validation` (default)
 
@@ -30,33 +30,41 @@ wgsl-rs = { version = "0.1", features = ["dispatch-runtime"] }
 
 Use this when writing tests that exercise fragment shaders without spinning up a full wgpu pipeline, or when debugging shader logic on the CPU.
 
-## `linkage-wgpu`
+## Linkage: a separate crate
 
-Enables wgpu linkage generation at `wgsl_rs::linkage::wgpu`. With this feature on, `#[wgsl]` modules emit the metadata needed to build wgpu render/compute pipelines from the generated shader source, including bind group layouts and entry-point descriptors.
-
-Enable it explicitly:
-
-```toml
-[dependencies]
-wgsl-rs = { version = "0.1", features = ["linkage-wgpu"] }
-```
-
-Use this in application crates that render or compute via wgpu. For pure shader authoring and validation it is not needed.
-
-## Combining features
-
-Features compose freely. A typical application crate enables both runtime features:
-
-```toml
-[dependencies]
-wgsl-rs = { version = "0.1", features = ["dispatch-runtime", "linkage-wgpu"] }
-```
-
-A shader-only library crate leaves everything at defaults:
+wgpu linkage generation used to live behind a `linkage-wgpu` feature. It now
+lives in the separate `wgsl-rs-linkage-wgpu` crate (compiled against each
+supported wgpu major), because the linkage output is wgpu types that do not
+interop across majors:
 
 ```toml
 [dependencies]
 wgsl-rs = "0.1"
+wgsl-rs-linkage-wgpu = "0.1" # default: latest wgpu major
+```
+
+Use this in application crates that render or compute via wgpu. For pure
+shader authoring and validation it is not needed. See
+[wgpu Linkage Overview](../linkage/overview.md) for pinned-major setup and
+the full API.
+
+## Combining features
+
+Features compose freely. A typical application crate leaves `wgsl-rs` at
+its defaults (`validation` and `dispatch-runtime` are both on) and adds
+the linkage crate:
+
+```toml
+[dependencies]
+wgsl-rs = "0.1"
+wgsl-rs-linkage-wgpu = "0.1"
+```
+
+A shader-only library crate strips the defaults it doesn't need:
+
+```toml
+[dependencies]
+wgsl-rs = { version = "0.1", default-features = false, features = ["validation"] }
 ```
 
 ## Reference
@@ -64,5 +72,8 @@ wgsl-rs = "0.1"
 | Feature            | Default | Module path                 | When to use                                     |
 | ------------------ | ------- | --------------------------- | ----------------------------------------------- |
 | `validation`       | on      | (macro-internal, naga)      | Always, unless you strip naga deliberately.     |
-| `dispatch-runtime` | off     | `wgsl_rs::std::runtime`     | CPU-side fragment dispatch and roundtrip tests. |
-| `linkage-wgpu`     | off     | `wgsl_rs::linkage::wgpu`    | Building wgpu pipelines from shader modules.    |
+| `dispatch-runtime` | on      | `wgsl_rs::std::runtime`     | CPU-side fragment dispatch and roundtrip tests. |
+
+| Separate crate               | Default        | When to use                                  |
+| ---------------------------- | -------------- | -------------------------------------------- |
+| `wgsl-rs-linkage-wgpu`       | latest wgpu major | Building wgpu pipelines from shader modules. |

@@ -1,12 +1,13 @@
 //! Linkage machinery for `wgsl-rs`.
 //!
 //! ## wgpu linkage
-//! Runtime wgpu linkage analysis lives in the `wgpu` submodule, gated
-//! behind the `linkage-wgpu` feature. The runtime analyzer walks the IR
-//! produced by a `#[wgsl]` source (post-instantiation for templates) and
-//! produces bind group layouts, pipeline state descriptors, and buffer
-//! descriptors without any compile-time code generation from the
-//! proc-macro. See the `wgpu` module for details.
+//! Runtime wgpu linkage analysis lives outside this crate, in the
+//! `wgsl-rs-linkage-wgpu` facade (one crate per supported wgpu major:
+//! `wgsl-rs-linkage-wgpu-v29`, `-v30`, ...). The runtime analyzer walks
+//! the IR produced by a `#[wgsl]` source (post-instantiation for
+//! templates) and produces bind group layouts, pipeline state
+//! descriptors, and buffer descriptors without any compile-time code
+//! generation from the proc-macro. `wgsl-rs` itself stays wgpu-free.
 //!
 //! ## Source instantiation
 //! When a `#[wgsl]` source contains generic linkage variables (e.g.
@@ -19,9 +20,6 @@
 //! `T: Type<Is = U>` is satisfied iff `T` and `U` are the same type.
 //! This is used in the `where` clause of the generated `instantiate`
 //! function to catch conflicting specialisations at compile time.
-
-#[cfg(feature = "linkage-wgpu")]
-pub mod wgpu;
 
 /// A trivial trait for type equality checking.
 ///

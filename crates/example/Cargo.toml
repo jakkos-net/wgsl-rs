@@ -12,4 +12,5 @@ log.workspace = true
 naga.workspace = true
 winit.workspace = true
 wgpu.workspace = true
-wgsl-rs = { path = "../wgsl-rs", features = ["linkage-wgpu"] }
+wgsl-rs = { path = "../wgsl-rs" }
+wgsl-rs-linkage-wgpu = { path = "../wgsl-rs-linkage-wgpu" }

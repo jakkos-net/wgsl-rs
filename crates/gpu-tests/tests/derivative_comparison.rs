@@ -99,6 +99,7 @@ async fn get_adapter_device_and_queue_inner() -> Option<(wgpu::Adapter, wgpu::De
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: None,
             force_fallback_adapter: false,
+            apply_limit_buckets: false,
         })
         .await
         .map_err(|e| eprintln!("{e}"))
@@ -229,7 +230,7 @@ fn readback_inner(
         .map_err(|_| "buffer mapping channel closed")?
         .map_err(|_| "buffer mapping failed")?;
 
-    let data = staging.slice(..).get_mapped_range();
+    let data = staging.slice(..).get_mapped_range().unwrap();
     let mut pixels = Vec::with_capacity((width * height) as usize);
     for y in 0..height {
         let row_offset = (y * bytes_per_row) as usize;
@@ -263,7 +264,7 @@ fn render_single_target(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &derivative_shader::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("derivative_test"));
@@ -338,7 +339,7 @@ fn render_variant_targets(
 
     // Runtime IR-based wgpu linkage analysis (issue #120).
     let module = &derivative_variants_shader::WGSL_SOURCE;
-    let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(module).unwrap();
+    let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(module).unwrap();
     let module = linkage.shader_module(device);
 
     let pipeline_layout = linkage.pipeline_layout(device, Some("variant_test"));

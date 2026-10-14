@@ -124,7 +124,7 @@ impl RoundtripTest for SynchronizationTest {
             let input_bytes = bytemuck::cast_slice(&input);
             let output_size = (INVOCATIONS * std::mem::size_of::<u32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&workgroup_barrier_sum::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&workgroup_barrier_sum::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -152,7 +152,7 @@ impl RoundtripTest for SynchronizationTest {
             let input_bytes = bytemuck::cast_slice(&input);
             let output_size = (INVOCATIONS * 2 * std::mem::size_of::<u32>()) as u64;
             let mut linkage =
-                wgsl_rs::linkage::wgpu::analyze_wgsl_module(&storage_barrier_sum::WGSL_SOURCE)
+                wgsl_rs_linkage_wgpu::analyze_wgsl_module(&storage_barrier_sum::WGSL_SOURCE)
                     .unwrap();
             let gpu_bytes = harness::run_gpu_compute_linked(&mut harness::GpuComputeParamsLinked {
                 device,
@@ -180,7 +180,7 @@ impl RoundtripTest for SynchronizationTest {
         {
             let input_bytes = bytemuck::cast_slice(&input);
             let output_size = (INVOCATIONS * std::mem::size_of::<u32>()) as u64;
-            let mut linkage = wgsl_rs::linkage::wgpu::analyze_wgsl_module(
+            let mut linkage = wgsl_rs_linkage_wgpu::analyze_wgsl_module(
                 &workgroup_uniform_load_scalar::WGSL_SOURCE,
             )
             .unwrap();

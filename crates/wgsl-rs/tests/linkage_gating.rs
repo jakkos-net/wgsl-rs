@@ -1,16 +1,13 @@
 //! Regression test for wgsl-rs#72.
 //!
-//! Ensures that wgpu linkage is not produced when the `linkage-wgpu` feature
-//! is disabled. The macro should emit only the CPU-side runtime API
-//! (`Uniform::new`, `Storage::new`, `get!`, `get_mut!`) and no `wgpu::*`,
-//! `linkage::wgpu::*`, `WgpuLinkage`, or bind-group references should appear
-//! in the compiled output.
-//!
-//! This test is gated on `not(feature = "linkage-wgpu")` so it only runs in
-//! the default/no-feature build. The companion `linkage_wgpu.rs` integration
-//! test covers the feature-enabled path.
+//! Ensures that a `#[wgsl]` module's rendered WGSL carries no wgpu
+//! linkage artifacts. Since wgpu linkage moved out of this crate (into
+//! the `wgsl-rs-linkage-wgpu` crates), `wgsl-rs` no longer even has a
+//! `wgpu` dependency; this guards the CPU-side runtime API
+//! (`Uniform::new`, `Storage::new`, `get!`, `get_mut!`) and the rendered
+//! source against any `wgpu`, `linkage`, or bind-group references
+//! creeping back in.
 
-#![cfg(not(feature = "linkage-wgpu"))]
 #![allow(dead_code)]
 
 use wgsl_rs::wgsl;
@@ -42,11 +39,11 @@ mod linkage_gating {
 }
 
 #[test]
-fn module_renders_without_linkage_wgpu_feature() {
-    // With `linkage-wgpu` off, the `#[wgsl]` module must still expand and
-    // render to valid WGSL — the CPU-side runtime API (`uniform!`/`storage!`/
-    // `get!`/`get_mut!`) is available without the feature, and no wgpu
-    // linkage codegen should be triggered. This is a smoke test that the
+fn module_renders_without_linkage_crates() {
+    // The `#[wgsl]` module must still expand and render to valid WGSL —
+    // the CPU-side runtime API (`uniform!`/`storage!`/`get!`/`get_mut!`)
+    // is available without any linkage crate, and no wgpu linkage
+    // codegen should be triggered. This is a smoke test that the
     // module compiles and renders; the next test asserts the rendered
     // source contains no wgpu/linkage artifacts.
     let _ = linkage_gating::WGSL_SOURCE.wgsl_source().unwrap();
