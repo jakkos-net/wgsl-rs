@@ -1624,8 +1624,12 @@ inside `wgsl-rs` behind a `linkage-wgpu` feature with a single optional
 `wgpu` dependency, so a crate can pin exactly one major — every user was
 forced onto whatever `wgsl-rs` happened to pin, and users on the other
 major could not use linkage at all. Cargo features cannot fix this:
-feature unification across a dependency graph collapses to one resolved
-`wgpu` per build.
+features are additive, so two graph members requesting different majors
+both compile the one in-crate module, and the single optional `wgpu`
+dependency resolves to exactly one major — features cannot select a
+dependency's version. Separate crates can: cargo resolves
+semver-incompatible majors as distinct graph nodes (this PR's lockfile
+holds wgpu 29 and 30 simultaneously).
 
 **Decision.** Linkage generation moves out of `wgsl-rs` into versioned
 crates, one per supported wgpu major:

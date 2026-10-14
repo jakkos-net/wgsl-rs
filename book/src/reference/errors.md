@@ -27,7 +27,7 @@ creating a bind group by name.
 
 | Variant                        | When                                                          |
 |--------------------------------|---------------------------------------------------------------|
-| `TemplateResolution { .. }`    | Analysis was requested for a template source that has not been instantiated with concrete types. |
+| `TemplateResolution { .. }`    | Analysis was requested for a template source that has not been instantiated with concrete types, or the source graph references an imported template that is missing or ambiguous (converted from `SourceError::TemplateNotFound` / `SourceError::AmbiguousTemplate`). |
 | `NoSuchBindGroup { .. }`       | `create_bind_group_named` was called for a `@group(N)` the module does not declare. |
 | `MissingBinding { .. }`        | A named-resource bind group creation is missing a resource for one of the group's declared binding names. |
 | `UnknownBindingName { .. }`    | A named-resource creation provided a resource for a name the group does not declare. |
@@ -55,6 +55,14 @@ let linkage = match analyze_wgsl_module(&my_shader::WGSL_SOURCE) {
     }
     Err(other) => return Err(other),
 };
+```
+
+When the error came from a missing or ambiguous *imported* template,
+instantiating the root is not the fix: provide (or disambiguate) the
+imported module so the source graph can be assembled in the first place.
+
+```rust
+use wgsl_rs_linkage_wgpu::Error;
 
 // Named-resource bind group creation surfaces the binding-name variants:
 match linkage.create_bind_group_named(0, &device, &[("FRAME", binding)]) {

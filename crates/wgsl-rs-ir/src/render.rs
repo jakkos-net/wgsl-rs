@@ -1624,4 +1624,49 @@ mod tests {
         let ty = Type::Scalar(ScalarType::U32);
         assert!(!render_io_attrs(io, &ty).contains("@interpolate"));
     }
+
+    /// Integer-typed `@location` *return* annotations (vertex outputs)
+    /// also gain explicit flat. This exercises the return-type branch in
+    /// `write_fn`, which is separate code from
+    /// [`write_inter_stage_io_attrs`].
+    #[test]
+    fn renders_flat_for_integer_location_return() {
+        let fn_with = |annotation, ty| {
+            Item::Fn(crate::types::ItemFn {
+                type_params: vec![],
+                const_params: vec![],
+                fn_attrs: crate::types::FnAttrs::Vertex,
+                name: "vtx_main".into(),
+                inputs: vec![],
+                return_type: ReturnType::Type { annotation, ty },
+                block: crate::types::Block { stmts: vec![] },
+                attrs: vec![],
+            })
+        };
+        let module = |annotation, ty| Module {
+            name: "test",
+            items: vec![fn_with(annotation, ty)],
+            attrs: vec![],
+        };
+
+        for annotation in [
+            ReturnTypeAnnotation::Location(1),
+            ReturnTypeAnnotation::DefaultLocation,
+        ] {
+            let src = render_module(&module(annotation, Type::Scalar(ScalarType::U32)));
+            assert!(
+                src.contains("@location(") && src.contains("@interpolate(flat) u32"),
+                "integer location return must carry explicit flat, got:\n{src}"
+            );
+        }
+
+        let src = render_module(&module(
+            ReturnTypeAnnotation::Location(0),
+            Type::Scalar(ScalarType::F32),
+        ));
+        assert!(
+            !src.contains("@interpolate"),
+            "float location return keeps default interpolation, got:\n{src}"
+        );
+    }
 }

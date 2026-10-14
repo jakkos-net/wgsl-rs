@@ -53,7 +53,7 @@ use wgsl_rs_linkage_wgpu::{analyze_wgsl_module, analyze_ir_module, WgpuLinkage};
 let linkage: WgpuLinkage = analyze_wgsl_module(&my_shader::WGSL_SOURCE)?;
 
 // From an instantiated template's IR (see [Template Modules & Instantiation](../generics/templates.md)):
-let concrete_ir: ir::Module = template.instantiate::<f32, u32>();
+let concrete_ir: ir::Module = my_shader::instantiate::<f32, u32>();
 let linkage: WgpuLinkage = analyze_ir_module(concrete_ir);
 ```
 
@@ -66,7 +66,7 @@ as a shorthand for `analyze_ir_module`. For a `Source`, use
 use wgsl_rs_linkage_wgpu::*;
 
 // From a concrete IR module (e.g. a template instantiation):
-let linkage = template.instantiate::<f32, u32>().generate_linkage();
+let linkage = my_shader::instantiate::<f32, u32>().generate_linkage();
 
 // From a Source:
 let linkage = analyze_wgsl_module(&my_shader::WGSL_SOURCE)?;
@@ -83,7 +83,7 @@ let linkage = analyze_wgsl_module(&my_shader::WGSL_SOURCE)?;
 | `compute_entry(name)` | `Option<&ComputeEntryInfo>` | Compute entry point info (workgroup size). |
 | `bind_group(n)` | `Option<&BindGroupInfo>` | Bind group at `@group(n)`. |
 | `bind_groups` | `&BTreeMap<u32, BindGroupInfo>` | All bind groups. |
-| `create_bind_group_named(group, device, resources)` | `wgpu::BindGroup` | Creates a bind group by binding names, caching the layout. |
+| `create_bind_group_named(group, device, resources)` | `Result<wgpu::BindGroup, Error>` | Creates a bind group by binding names, caching the layout. |
 | `pipeline_layout(&mut self, device, label)` | `wgpu::PipelineLayout` | Pipeline layout, lazily cached. |
 | `buffer(name)` | `Option<&BufferDescriptorInfo>` | Find a buffer by its binding name. |
 

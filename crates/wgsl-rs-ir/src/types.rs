@@ -1082,7 +1082,8 @@ impl Module {
     ///
     /// For methods that need access to `wgsl-rs` types (e.g. `WgpuLinkage`),
     /// see the `wgsl_rs_linkage_wgpu::IrModuleExt` extension trait in the
-    /// `wgsl-rs-linkage-wgpu` crates.
+    /// `wgsl-rs-linkage-wgpu` crates (`wgsl_rs_linkage_wgpu::v29::IrModuleExt`
+    /// when pinned to an older major).
     pub fn wgsl_source(&self) -> String {
         let mut module = self.clone();
         crate::suffix_module(&mut module);

@@ -32,9 +32,12 @@
 //! # Example
 //!
 //! ```ignore
-//! use wgsl_rs_linkage_wgpu_v30 as wgpu;
+//! // Import the linkage API matching your wgpu major: the facade's
+//! // root (`wgsl-rs-linkage-wgpu`) by default, or its `v29` module
+//! // path when pinned.
+//! use wgsl_rs_linkage_wgpu as wgpu_linkage;
 //!
-//! let linkage = wgpu::analyze_wgsl_module(&hello_triangle::WGSL_SOURCE).unwrap();
+//! let linkage = wgpu_linkage::analyze_wgsl_module(&hello_triangle::WGSL_SOURCE).unwrap();
 //! let shader_module = linkage.shader_module(&device);
 //! let bg_layout = linkage.bind_group(0).unwrap().layout(&device);
 //! let bg = linkage.bind_group(0).unwrap().create(
