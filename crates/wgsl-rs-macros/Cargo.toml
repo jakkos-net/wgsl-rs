@@ -11,7 +11,7 @@ rust-version = "1.87"
 [features]
 # Historically a `linkage-wgpu` feature here controlled compile-time
 # wgpu linkage generation in the proc-macro. Since issue #120, wgpu
-# linkage is produced at runtime by the `wgsl-rs-linkage-wgpu` crates;
+# linkage is produced at runtime by the `wgsl-rs-linkage-wgpu` crate;
 # the no-op feature has been removed along with this crate's only
 # remaining reference to it.
 default = ["validation"]

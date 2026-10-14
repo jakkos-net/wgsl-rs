@@ -142,11 +142,11 @@ The project is split into a few parts:
   re-export, and extensions. Wgpu-free.
 - **`wgsl-rs-ir`** — The owned IR (`Module`, `Type`, `Expr`, `Stmt`, `Item`),
   `render_module`, and `substitute_types`.
-- **`wgsl-rs-linkage-wgpu`** / **`wgsl-rs-linkage-wgpu-v29`** /
-  **`wgsl-rs-linkage-wgpu-v30`** — wgpu linkage generation (bind group
-  layouts, entry-point state, buffer descriptors), one crate per supported
-  wgpu major. The unversioned facade defaults to the latest major; the
-  versioned crates are compiled against their pinned `wgpu`.
+- **`wgsl-rs-linkage-wgpu`** — wgpu linkage generation (bind group
+  layouts, entry-point state, buffer descriptors), one feature per
+  supported wgpu major. The default feature tracks the latest major;
+  older majors are opt-in (`default-features = false, features =
+  ["v29"]`) so users only compile the wgpu they use.
 - **`wgsl-rs-layout`** / **`wgsl-rs-layout-macros`** — WGSL memory layout
   computation (`WgslLayout`/`Layout` traits, `#[derive(Layout)]`).
 - **`example`** — Runnable example modules demonstrating every supported

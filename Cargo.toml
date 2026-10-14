@@ -12,8 +12,6 @@ members = [
   "crates/wgsl-rs-layout",
   "crates/wgsl-rs-layout-macros",
   "crates/wgsl-rs-linkage-wgpu",
-  "crates/wgsl-rs-linkage-wgpu-v29",
-  "crates/wgsl-rs-linkage-wgpu-v30",
   "crates/wgsl-rs-macros",
   "crates/xtask"
 ]

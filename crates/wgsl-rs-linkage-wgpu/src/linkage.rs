@@ -1,156 +1,50 @@
-//! Runtime wgpu linkage analysis for WGSL modules.
-//!
-//! This file is the canonical linkage implementation, compiled by each
-//! version crate (`wgsl-rs-linkage-wgpu-v30`, `wgsl-rs-linkage-wgpu-v29`,
-//! ...) against its pinned `wgpu`. The version crates keep identical
-//! copies of this file; `cargo xtask ci linkage-matrix` fails if they
-//! drift. A version crate forks its copy only when a wgpu major
-//! actually diverges from this API.
-//!
-//! Given an [`ir::Module`] (produced by a `#[wgsl]` source's
-//! `WGSL_SOURCE.ir_constructor`, or by the macro-emitted
-//! `instantiate::<...>()` function for templates), this module extracts
-//! the binding and entry-point information needed to build wgpu
-//! pipelines.
-//!
-//! # Why at runtime?
-//!
-//! The pre-[#120](https://github.com/schell/wgsl-rs/issues/120)
-//! implementation generated all of this at proc-macro expansion time by walking
-//! the parse tree in `wgsl-rs-macros/src/linkage.rs`. That had two drawbacks:
-//!
-//! 1. Template modules (`#[wgsl]` modules with type parameters) couldn't get
-//!    any linkage — the generated WGSL was a template with `__TP{name}__`
-//!    placeholders, so a `wgpu::ShaderModule` couldn't be built from it.
-//! 2. The proc-macro walked a parse tree that duplicated information already
-//!    present in `wgsl-rs-ir`.
-//!
-//! Walking the runtime IR unifies the two cases. After the macro-emitted
-//! `instantiate::<...>()` function produces a concrete `ir::Module`, the
-//! same analyzer used for non-template sources works on the result.
-//!
-//! # Example
-//!
-//! ```ignore
-//! // Import the linkage API matching your wgpu major: the facade's
-//! // root (`wgsl-rs-linkage-wgpu`) by default, or its `v29` module
-//! // path when pinned.
-//! use wgsl_rs_linkage_wgpu as wgpu_linkage;
-//!
-//! let linkage = wgpu_linkage::analyze_wgsl_module(&hello_triangle::WGSL_SOURCE).unwrap();
-//! let shader_module = linkage.shader_module(&device);
-//! let bg_layout = linkage.bind_group(0).unwrap().layout(&device);
-//! let bg = linkage.bind_group(0).unwrap().create(
-//!     &device, &bg_layout, &[frame_uniform.as_entire_binding()],
-//! );
-//! let vtx = linkage.vertex_entries.iter().find(|e| e.name == "vtx_main").unwrap()
-//!     .vertex_state(&shader_module);
-//! ```
+// The per-major wgpu adapter, included by `src/lib.rs` into each
+// feature-gated `vNN` module with that major's `wgpu` aliased into
+// scope. Because this file is textually included (rather than declared
+// as a module), it must stay free of inner attributes (`//!`), and it
+// is compiled once per enabled major as the body of `crate::vNN`.
+//
+// The wgpu-free core (errors, IR assembly, WGSL §14.4.1 sizing, binding
+// metadata, and the wgsl-rs#177 stage analysis) lives in
+// `crate::analysis`, compiled exactly once per crate.
+//
+// Given an `ir::Module` (produced by a `#[wgsl]` source's
+// `WGSL_SOURCE.ir_constructor`, or by the macro-emitted
+// `instantiate::<...>()` function for templates), this module extracts
+// the binding and entry-point information needed to build wgpu
+// pipelines at runtime (no proc-macro-time code generation), so
+// template instantiations get the same linkage analysis as concrete
+// sources.
+//
+// A wgpu major forks this file only when it actually diverges from
+// this API: the diverging `vNN` module includes its own copy and drops
+// the shared include.
+//
+// The pinned `wgpu` is re-exported by the including module
+// (`pub use wgpuNN as wgpu;` in `src/lib.rs`), so linkage consumers can
+// import every type the API produces from one path.
 
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
 };
 
-use snafu::prelude::*;
 use wgsl_rs_ir as ir;
 
 use wgsl_rs::Source;
 
-// Re-export the pinned wgpu so linkage consumers can import every type
-// the API produces from one path.
-pub use wgpu;
+// The shared, wgpu-free analysis core, compiled once per crate (not
+// once per major). Re-exported here so each major module exposes the
+// same surface the pre-combination version crates had.
+pub use crate::analysis::{
+    BindingKind, BindingMeta, BufferKind, ComputeEntryInfo, Error, Stage, Stages, TypeLayout,
+    type_byte_size,
+};
 
-/// Errors thrown by the WGPU linkage module.
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display(
-        "Unable to resolve template '{template_name}' for type args {:?}; available templates: \
-         {:?}",
-        mangled_type_args,
-        available
-    ))]
-    TemplateResolution {
-        template_name: String,
-        mangled_type_args: Vec<String>,
-        available: Vec<String>,
-    },
-
-    #[snafu(display(
-        "{module}::bind_group_{group}: missing binding resource for declared name {name:?}"
-    ))]
-    MissingBinding {
-        module: &'static str,
-        group: u32,
-        name: String,
-    },
-
-    #[snafu(display(
-        "{module}::bind_group_{group}: resource provided for unknown binding name {name:?} \
-         (declared names: {declared:?})"
-    ))]
-    UnknownBindingName {
-        module: &'static str,
-        group: u32,
-        name: String,
-        declared: Vec<String>,
-    },
-
-    #[snafu(display(
-        "{module}::bind_group_{group}: binding name {name:?} appears more than once in resources"
-    ))]
-    DuplicateBindingName {
-        module: &'static str,
-        group: u32,
-        name: String,
-    },
-
-    #[snafu(display(
-        "{module}: no bind group @group({group}) declared; available groups: {available:?}"
-    ))]
-    NoSuchBindGroup {
-        module: &'static str,
-        group: u32,
-        available: Vec<u32>,
-    },
-}
-
-impl From<wgsl_rs::SourceError<'_>> for Error {
-    fn from(err: wgsl_rs::SourceError<'_>) -> Self {
-        match err {
-            wgsl_rs::SourceError::TemplateWgsl {
-                uninstantiated_source,
-            } => Error::TemplateResolution {
-                template_name: format!("<source {}>", uninstantiated_source.name),
-                mangled_type_args: uninstantiated_source
-                    .module_type_params
-                    .iter()
-                    .map(|s| (*s).to_string())
-                    .collect(),
-                available: Vec::new(),
-            },
-            wgsl_rs::SourceError::TemplateNotFound {
-                template_name,
-                mangled_type_args,
-                available_templates,
-            } => Error::TemplateResolution {
-                template_name,
-                mangled_type_args,
-                available: available_templates,
-            },
-            wgsl_rs::SourceError::AmbiguousTemplate {
-                template_name,
-                mangled_type_args,
-                matching_source_names,
-                available_templates: _,
-            } => Error::TemplateResolution {
-                template_name,
-                mangled_type_args,
-                available: matching_source_names,
-            },
-        }
-    }
-}
+use crate::analysis::{
+    DuplicateBindingNameSnafu, MissingBindingSnafu, NoSuchBindGroupSnafu, UnknownBindingNameSnafu,
+    analyze_stages, assemble_ir, binding_kind_label, buffer_kind_label,
+};
 
 /// All the wgpu linkage information extracted from a WGSL module.
 ///
@@ -289,30 +183,6 @@ impl core::fmt::Display for WgpuLinkage {
         )?;
 
         Ok(())
-    }
-}
-
-/// A human-readable label for a [`BindingKind`].
-fn binding_kind_label(kind: &BindingKind) -> &'static str {
-    match kind {
-        BindingKind::Uniform => "uniform",
-        BindingKind::Storage { read_only: true } => "storage, read-only",
-        BindingKind::Storage { read_only: false } => "storage, read-write",
-        BindingKind::Sampler { comparison: true } => "comparison sampler",
-        BindingKind::Sampler { comparison: false } => "sampler",
-        BindingKind::Texture => "texture",
-        BindingKind::DepthTexture => "depth texture",
-        BindingKind::StorageTexture { read_write: true } => "storage texture, read-write",
-        BindingKind::StorageTexture { read_write: false } => "storage texture",
-    }
-}
-
-/// A human-readable label for a [`BufferKind`].
-fn buffer_kind_label(kind: &BufferKind) -> &'static str {
-    match kind {
-        BufferKind::Uniform => "uniform",
-        BufferKind::Storage { read_only: true } => "storage, read-only",
-        BufferKind::Storage { read_only: false } => "storage, read-write",
     }
 }
 
@@ -564,35 +434,6 @@ pub struct BindGroupInfo {
     pub label: String,
 }
 
-/// Metadata for a single binding inside a bind group.
-#[derive(Clone, Debug)]
-pub struct BindingMeta {
-    /// The declared Rust name (e.g. `"FRAME"`, `"DIFFUSE_TEX"`).
-    pub name: String,
-    /// The `@binding(N)` index.
-    pub binding: u32,
-    /// What kind of resource the binding expects.
-    pub kind: BindingKind,
-}
-
-/// The kind of resource a binding expects.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BindingKind {
-    /// A uniform buffer.
-    Uniform,
-    /// A storage buffer. `read_only` mirrors the WGSL access mode.
-    Storage { read_only: bool },
-    /// A (filtering) sampler.
-    Sampler { comparison: bool },
-    /// A sampled texture.
-    Texture,
-    /// A depth texture.
-    DepthTexture,
-    /// A storage texture. The `read_write` flag distinguishes
-    /// `read_write` access from `read`-only or `write`-only.
-    StorageTexture { read_write: bool },
-}
-
 impl BindGroupInfo {
     /// Builds a `wgpu::BindGroupLayoutDescriptor` borrowing this struct.
     /// The returned descriptor borrows from `self`, so `self` must
@@ -770,24 +611,6 @@ impl EntryPointInfo {
     }
 }
 
-/// A compute shader entry point.
-#[derive(Clone, Debug)]
-pub struct ComputeEntryInfo {
-    /// The entry point name (see [`EntryPointInfo::name`] for the
-    /// `Cow<'static, str>` rationale).
-    pub name: Cow<'static, str>,
-    /// The `@workgroup_size(X, Y, Z)` dimensions.
-    pub workgroup_size: (u32, u32, u32),
-    /// A default label for descriptors (`"<module>::<name>"`).
-    pub label: String,
-}
-
-// `ComputeEntryInfo` currently exposes only public fields. Helper
-// methods for building compute pipelines live in caller code (the
-// `wgpu::ComputePipelineDescriptor` shape is simple enough to assemble
-// at the call site, and the previous `compute_pipeline_descriptor` /
-// `compute_pipeline` helpers had zero in-tree call sites).
-
 // ===== Buffer descriptors =====
 
 /// A pre-built `wgpu::BufferDescriptor` for a `uniform!` or `storage!`
@@ -842,52 +665,6 @@ impl BufferDescriptorInfo {
     }
 }
 
-/// What kind of GPU buffer a [`BufferDescriptorInfo`] describes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BufferKind {
-    /// A uniform buffer (`var<uniform>`).
-    Uniform,
-    /// A storage buffer (`var<storage, read[_write]>`).
-    Storage { read_only: bool },
-}
-
-/// The wgpu shader stage of an entry-point fn, or `None` for helper fns.
-fn stage_of(fn_attrs: &ir::FnAttrs) -> Option<wgpu::ShaderStages> {
-    match fn_attrs {
-        ir::FnAttrs::Vertex => Some(wgpu::ShaderStages::VERTEX),
-        ir::FnAttrs::Fragment => Some(wgpu::ShaderStages::FRAGMENT),
-        ir::FnAttrs::Compute { .. } => Some(wgpu::ShaderStages::COMPUTE),
-        ir::FnAttrs::None => None,
-    }
-}
-
-/// Value identifiers and call edges collected from a fn body, kept
-/// separate so a local (or parameter) that shadows a helper-fn name is
-/// not mistaken for a call (PR #190 review finding).
-#[derive(Default)]
-struct FnRefs {
-    /// `Expr::Ident` references: bindings, locals, params.
-    idents: std::collections::HashSet<String>,
-    /// `Expr::FnCall` callee paths; method calls are mangled
-    /// (`Type_method`). Only these are traversed as call-graph edges.
-    callees: std::collections::HashSet<String>,
-}
-
-/// Records a function's call-graph entry: its (possibly mangled) name
-/// and the value identifiers and call edges its body references (see
-/// [`collect_refs_in_block`]).
-fn record_fn_idents(
-    f: &ir::ItemFn,
-    name: String,
-    fn_names: &mut std::collections::HashSet<String>,
-    fn_refs: &mut std::collections::HashMap<String, FnRefs>,
-) {
-    let mut refs = FnRefs::default();
-    collect_refs_in_block(&mut refs, &f.block);
-    fn_names.insert(name.clone());
-    fn_refs.insert(name, refs);
-}
-
 /// Analyzes an IR module and returns its wgpu linkage.
 ///
 /// This is the core entry point. It expects a concrete IR module (no
@@ -920,102 +697,16 @@ pub fn analyze_ir_module(mut ir_module: wgsl_rs_ir::Module) -> WgpuLinkage {
         buffers: Vec::new(),
     };
 
-    // First pass: collect every binding declaration, and record the
-    // identifiers used by every function — entry points and helpers
-    // alike. Per-binding `ShaderStages` visibility is then computed
-    // transitively in a second pass by walking each entry point's call
-    // graph, so bindings referenced only inside helper functions
-    // called from an entry point still carry that entry point's stage
-    // (wgsl-rs#177).
-    let mut binding_names: std::collections::HashSet<String> = std::collections::HashSet::new();
-    // Every function name in the module, including impl methods under
-    // their mangled render names (`Type_method`).
-    let mut fn_names: std::collections::HashSet<String> = std::collections::HashSet::new();
-    // Per-fn reference sets: value identifiers and call edges, kept
-    // separate (see [`FnRefs`]) so a local shadowing a helper-fn name
-    // is not mistaken for a call.
-    let mut fn_refs: std::collections::HashMap<String, FnRefs> = std::collections::HashMap::new();
-    let mut entry_points: Vec<(String, wgpu::ShaderStages)> = Vec::new();
+    // Binding-use analysis (wgsl-rs#177) lives in the wgpu-free core:
+    // it resolves, transitively through helper functions, which stages
+    // reference each binding. `visibility_for` below translates each
+    // stage set into `wgpu::ShaderStages`.
+    let referenced = analyze_stages(&linkage.ir);
 
     for item in &linkage.ir.items {
         match item {
             ir::Item::Uniform(u) => {
-                binding_names.insert(u.name.clone());
-            }
-            ir::Item::Storage(s) => {
-                binding_names.insert(s.name.clone());
-            }
-            ir::Item::Sampler(s) => {
-                binding_names.insert(s.name.clone());
-            }
-            ir::Item::Texture(t) => {
-                binding_names.insert(t.name.clone());
-            }
-            ir::Item::Fn(f) => {
-                record_fn_idents(f, f.name.to_string(), &mut fn_names, &mut fn_refs);
-                if let Some(stage) = stage_of(&f.fn_attrs) {
-                    entry_points.push((f.name.to_string(), stage));
-                }
-            }
-            ir::Item::Impl(imp) => {
-                for impl_item in &imp.items {
-                    let ir::ImplItem::Fn(f) = impl_item else {
-                        continue;
-                    };
-                    // Impl methods are invoked via their mangled render
-                    // names (`Type_method`), so key the call graph by the
-                    // same mangled name.
-                    let mangled = ir::mangle::mangle(&[&imp.self_ty, &f.name]);
-                    record_fn_idents(f, mangled.clone(), &mut fn_names, &mut fn_refs);
-                    if let Some(stage) = stage_of(&f.fn_attrs) {
-                        entry_points.push((mangled, stage));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Second pass: resolve per-binding stage visibility transitively.
-    // Starting from each entry point, walk the module call graph and
-    // union every reachable function's referenced bindings into the
-    // entry point's stage. The visited set guards against (spec-
-    // illegal) recursive call cycles.
-    let mut referenced: std::collections::HashMap<String, wgpu::ShaderStages> =
-        std::collections::HashMap::new();
-    for (entry_name, stage) in &entry_points {
-        let mut visited: std::collections::HashSet<&String> = std::collections::HashSet::new();
-        let mut stack: Vec<&String> = vec![entry_name];
-        while let Some(fname) = stack.pop() {
-            if !visited.insert(fname) {
-                continue;
-            }
-            let Some(refs) = fn_refs.get(fname) else {
-                continue;
-            };
-            // Bindings are attributed from value identifiers only; call
-            // edges come from `callees` only, so a same-named local can
-            // never masquerade as a call.
-            for name in &refs.idents {
-                if binding_names.contains(name) {
-                    referenced
-                        .entry(name.clone())
-                        .and_modify(|s| *s |= *stage)
-                        .or_insert(*stage);
-                }
-            }
-            for callee in &refs.callees {
-                if fn_names.contains(callee) {
-                    stack.push(callee);
-                }
-            }
-        }
-    }
-
-    for item in &linkage.ir.items {
-        match item {
-            ir::Item::Uniform(u) => {
-                let size = type_byte_size_or_zero(&u.ty, &linkage.ir);
+                let size = type_byte_size(&u.ty, &linkage.ir);
                 let entry = wgpu::BindGroupLayoutEntry {
                     binding: u.binding,
                     visibility: visibility_for(&referenced, &u.name),
@@ -1061,7 +752,7 @@ pub fn analyze_ir_module(mut ir_module: wgsl_rs_ir::Module) -> WgpuLinkage {
             }
             ir::Item::Storage(s) => {
                 let read_only = matches!(s.access, ir::StorageAccess::Read);
-                let size = type_byte_size_or_zero(&s.ty, &linkage.ir);
+                let size = type_byte_size(&s.ty, &linkage.ir);
                 let entry = wgpu::BindGroupLayoutEntry {
                     binding: s.binding,
                     visibility: visibility_for(&referenced, &s.name),
@@ -1213,179 +904,29 @@ pub fn analyze_ir_module(mut ir_module: wgsl_rs_ir::Module) -> WgpuLinkage {
 }
 
 /// Returns the `ShaderStages` visibility for a binding given the
-/// per-binding reference map. If no entry-point function references
-/// the binding (e.g. the binding is only declared but unused, or the
-/// reference walker missed it), we default to `COMPUTE` — the most
-/// common stage for the wgsl-rs roundtrip-test use case. The previous
-/// `ShaderStages::all()` default would silently demand the
-/// `VERTEX_WRITABLE_STORAGE` feature for any read_write storage, which
-/// is almost never what the user wants.
-fn visibility_for(
-    referenced: &std::collections::HashMap<String, wgpu::ShaderStages>,
-    name: &str,
-) -> wgpu::ShaderStages {
-    referenced
-        .get(name)
-        .copied()
-        .unwrap_or(wgpu::ShaderStages::COMPUTE)
-}
-
-/// Walks an `ir::Block`, collecting value identifiers and call edges
-/// into `refs` (see [`FnRefs`]).
-fn collect_refs_in_block(refs: &mut FnRefs, block: &ir::Block) {
-    for stmt in &block.stmts {
-        collect_refs_in_stmt(refs, stmt);
+/// wgpu-free per-binding stage analysis. If no entry-point function
+/// references the binding (e.g. the binding is only declared but
+/// unused, or the reference walker missed it), we default to
+/// `COMPUTE` — the most common stage for the wgsl-rs roundtrip-test
+/// use case. The previous `ShaderStages::all()` default would silently
+/// demand the `VERTEX_WRITABLE_STORAGE` feature for any read_write
+/// storage, which is almost never what the user wants.
+fn visibility_for(referenced: &HashMap<String, Stages>, name: &str) -> wgpu::ShaderStages {
+    let stages = referenced.get(name).copied().unwrap_or_default();
+    let mut visibility = wgpu::ShaderStages::empty();
+    if stages.vertex {
+        visibility |= wgpu::ShaderStages::VERTEX;
     }
-}
-
-fn collect_refs_in_stmt(refs: &mut FnRefs, stmt: &ir::Stmt) {
-    match stmt {
-        ir::Stmt::Local(l) => {
-            if let Some(init) = &l.init {
-                collect_refs_in_expr(refs, init);
-            }
-        }
-        ir::Stmt::Const(c) => {
-            collect_refs_in_expr(refs, &c.expr);
-        }
-        ir::Stmt::Assignment { lhs, rhs } => {
-            collect_refs_in_expr(refs, lhs);
-            collect_refs_in_expr(refs, rhs);
-        }
-        ir::Stmt::CompoundAssignment { lhs, rhs, .. } => {
-            collect_refs_in_expr(refs, lhs);
-            collect_refs_in_expr(refs, rhs);
-        }
-        ir::Stmt::While { condition, body } => {
-            collect_refs_in_expr(refs, condition);
-            collect_refs_in_block(refs, body);
-        }
-        ir::Stmt::Loop { body } => {
-            collect_refs_in_block(refs, body);
-        }
-        ir::Stmt::Expr { expr, .. } => {
-            collect_refs_in_expr(refs, expr);
-        }
-        ir::Stmt::If(s) => {
-            collect_refs_in_expr(refs, &s.condition);
-            collect_refs_in_block(refs, &s.then_block);
-            if let Some(else_branch) = &s.else_branch {
-                match else_branch {
-                    ir::ElseBranch::Block(b) => collect_refs_in_block(refs, b),
-                    ir::ElseBranch::If(i) => {
-                        collect_refs_in_expr(refs, &i.condition);
-                        collect_refs_in_block(refs, &i.then_block);
-                        if let Some(else_branch) = &i.else_branch {
-                            match else_branch {
-                                ir::ElseBranch::Block(b) => collect_refs_in_block(refs, b),
-                                ir::ElseBranch::If(_) => {
-                                    // Shouldn't recurse infinitely; the IR is
-                                    // finite.
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        ir::Stmt::Return(Some(e)) => collect_refs_in_expr(refs, e),
-        ir::Stmt::For(f) => {
-            collect_refs_in_expr(refs, &f.from);
-            collect_refs_in_expr(refs, &f.to);
-            collect_refs_in_block(refs, &f.body);
-        }
-        ir::Stmt::Switch(s) => {
-            collect_refs_in_expr(refs, &s.selector);
-            for arm in &s.arms {
-                for sel in &arm.selectors {
-                    match sel {
-                        ir::CaseSelector::Literal(_) => {}
-                        ir::CaseSelector::Expr(e) => collect_refs_in_expr(refs, e),
-                        ir::CaseSelector::Default => {}
-                    }
-                }
-                collect_refs_in_block(refs, &arm.body);
-            }
-        }
-        ir::Stmt::Block(b) => collect_refs_in_block(refs, b),
-        ir::Stmt::SlabCopy {
-            src,
-            src_offset,
-            dest,
-            dest_offset,
-            size,
-        } => {
-            collect_refs_in_expr(refs, src);
-            collect_refs_in_expr(refs, src_offset);
-            collect_refs_in_expr(refs, dest);
-            collect_refs_in_expr(refs, dest_offset);
-            collect_refs_in_expr(refs, size);
-        }
-        ir::Stmt::Break
-        | ir::Stmt::Continue
-        | ir::Stmt::Discard
-        | ir::Stmt::Return(None)
-        | ir::Stmt::Macro { .. } => {}
+    if stages.fragment {
+        visibility |= wgpu::ShaderStages::FRAGMENT;
     }
-}
-
-fn collect_refs_in_expr(refs: &mut FnRefs, expr: &ir::Expr) {
-    match expr {
-        ir::Expr::Ident(name) => {
-            refs.idents.insert(name.clone());
-        }
-        ir::Expr::Lit(_) => {}
-        ir::Expr::Array { elems } => {
-            for e in elems {
-                collect_refs_in_expr(refs, e);
-            }
-        }
-        ir::Expr::Paren(e) => collect_refs_in_expr(refs, e),
-        ir::Expr::Binary { lhs, rhs, .. } => {
-            collect_refs_in_expr(refs, lhs);
-            collect_refs_in_expr(refs, rhs);
-        }
-        ir::Expr::Unary { expr, .. } => collect_refs_in_expr(refs, expr),
-        ir::Expr::ArrayIndexing { lhs, index } => {
-            collect_refs_in_expr(refs, lhs);
-            collect_refs_in_expr(refs, index);
-        }
-        ir::Expr::Swizzle { lhs, params, .. } => {
-            collect_refs_in_expr(refs, lhs);
-            if let Some(args) = params {
-                for a in args {
-                    collect_refs_in_expr(refs, a);
-                }
-            }
-        }
-        ir::Expr::Cast { lhs, .. } => collect_refs_in_expr(refs, lhs),
-        ir::Expr::FnCall { path, params, .. } => {
-            // Record the callee so the linkage analysis can resolve
-            // transitive binding use through helper functions
-            // (wgsl-rs#177). Method calls are recorded under their
-            // mangled render names, matching how impl methods are
-            // keyed in the call graph.
-            match path {
-                ir::FnPath::Ident(name) => {
-                    refs.callees.insert(name.clone());
-                }
-                ir::FnPath::TypeMethod { ty, method } => {
-                    refs.callees.insert(ir::mangle::mangle(&[ty, method]));
-                }
-            }
-            for p in params {
-                collect_refs_in_expr(refs, p);
-            }
-        }
-        ir::Expr::Struct { fields, .. } => {
-            for fv in fields {
-                collect_refs_in_expr(refs, &fv.expr);
-            }
-        }
-        ir::Expr::FieldAccess { base, .. } => collect_refs_in_expr(refs, base),
-        ir::Expr::TypePath { .. } => {}
-        ir::Expr::Reference(e) => collect_refs_in_expr(refs, e),
-        ir::Expr::ZeroValueArray { len, .. } => collect_refs_in_expr(refs, len),
+    if stages.compute {
+        visibility |= wgpu::ShaderStages::COMPUTE;
+    }
+    if visibility.is_empty() {
+        wgpu::ShaderStages::COMPUTE
+    } else {
+        visibility
     }
 }
 
@@ -1413,181 +954,6 @@ pub fn analyze_wgsl_module(wgsl_source: &Source) -> Result<WgpuLinkage, Error> {
     }
     let ir_module = assemble_ir(wgsl_source)?;
     Ok(analyze_ir_module(ir_module))
-}
-
-// ===== IR assembly (flattens imports) =====
-
-/// Build a single owned `ir::Module` from a `wgsl_rs::Source` and all
-/// its transitive imports and template instantiations. The result is
-/// concrete (no `Type::TypeParam`s) and self-contained: every struct
-/// referenced by a binding is defined within the assembled source.
-///
-/// This is the same traversal that `Source::wgsl_source()` performs,
-/// but it stops at IR rather than rendering. It exists so the runtime
-/// linkage analyzer can correctly size buffers whose types are defined
-/// in imported sources.
-pub(crate) fn assemble_ir(wgsl_source: &Source) -> Result<ir::Module, Error> {
-    let mut visited: std::collections::HashSet<u64> = std::collections::HashSet::new();
-    let mut seen: std::collections::HashSet<(u64, String, Vec<String>)> =
-        std::collections::HashSet::new();
-    let mut items: Vec<ir::Item> = Vec::new();
-    collect_items(wgsl_source, &mut visited, &mut seen, &mut items, None)?;
-    // Note: deshadowing is deferred to `analyze_ir_module`, which is the
-    // sole consumer of this assembled IR. Deshadowing here too would be
-    // redundant (the pass is idempotent but wastes work).
-    Ok(ir::Module {
-        name: wgsl_source.name,
-        items,
-        attrs: Vec::new(),
-    })
-}
-
-fn collect_items(
-    wgsl_source: &Source,
-    visited: &mut std::collections::HashSet<u64>,
-    seen: &mut std::collections::HashSet<(u64, String, Vec<String>)>,
-    out: &mut Vec<ir::Item>,
-    subst: Option<&std::collections::HashMap<String, ir::Type>>,
-) -> Result<(), Error> {
-    // Imports first (depth-first, deduplicated by source id).
-    for m in wgsl_source.imports {
-        if visited.insert(m.id) {
-            collect_items(m, visited, seen, out, None)?;
-        }
-    }
-
-    // This source's own items, optionally substituted.
-    let mut ir_module = (wgsl_source.ir_constructor)();
-    if let Some(s) = subst {
-        ir::substitute_types(&mut ir_module, s);
-    }
-    out.extend(ir_module.items);
-
-    // Cross-source template instantiations.
-    for inst in wgsl_source.instantiations {
-        let mangled: Vec<String> = inst
-            .mangled_type_args
-            .iter()
-            .map(|s| (*s).to_string())
-            .collect();
-        let type_args = (inst.type_args_constructor)();
-        collect_instantiation(
-            inst.modules,
-            inst.template_name,
-            &mangled,
-            &type_args,
-            out,
-            seen,
-        )?;
-    }
-    Ok(())
-}
-
-fn collect_instantiation(
-    sources: &[&Source],
-    template_name: &str,
-    mangled_type_args: &[String],
-    type_args: &[ir::Type],
-    out: &mut Vec<ir::Item>,
-    seen: &mut std::collections::HashSet<(u64, String, Vec<String>)>,
-) -> Result<(), Error> {
-    let available: Vec<String> = sources
-        .iter()
-        .copied()
-        .flat_map(|m| m.templates.iter().map(|t| t.name.to_string()))
-        .collect();
-
-    let mut matching: Vec<&Source> = sources
-        .iter()
-        .copied()
-        .filter(|m| m.templates.iter().any(|t| t.name == template_name))
-        .collect();
-
-    snafu::ensure!(
-        !matching.is_empty(),
-        TemplateResolutionSnafu {
-            template_name: template_name.to_string(),
-            mangled_type_args: mangled_type_args.to_vec(),
-            available,
-        }
-    );
-
-    if matching.len() > 1 {
-        let names: Vec<String> = matching.iter().map(|m| m.name.to_string()).collect();
-        return TemplateResolutionSnafu {
-            template_name: template_name.to_string(),
-            mangled_type_args: mangled_type_args.to_vec(),
-            available: names,
-        }
-        .fail();
-    }
-
-    let source = matching
-        .pop()
-        .expect("matching is non-empty after the check above");
-    let Some(template) = source.templates.iter().find(|t| t.name == template_name) else {
-        // Invariant: `matching` was built by filtering on
-        // `templates.iter().any(|t| t.name == template_name)`, so the
-        // sole surviving source must contain the template.
-        unreachable!(
-            "resolved source '{}' has no template '{}'; available: {:?}",
-            source.name, template_name, available
-        );
-    };
-
-    let key = (
-        source.id,
-        template_name.to_string(),
-        mangled_type_args.to_vec(),
-    );
-    snafu::ensure!(
-        seen.insert(key),
-        TemplateResolutionSnafu {
-            template_name: template_name.to_owned(),
-            mangled_type_args: mangled_type_args.to_vec(),
-            available
-        }
-    );
-
-    // Recurse into dependencies first.
-    for dep in template.dependencies {
-        let dep_mangled: Vec<String> = dep
-            .type_param_mapping
-            .iter()
-            .map(|&idx| mangled_type_args[idx].clone())
-            .collect();
-        let dep_args: Vec<ir::Type> = dep
-            .type_param_mapping
-            .iter()
-            .map(|&idx| type_args[idx].clone())
-            .collect();
-        collect_instantiation(&[source], dep.callee, &dep_mangled, &dep_args, out, seen)?;
-    }
-
-    let mut subst: std::collections::HashMap<String, ir::Type> = std::collections::HashMap::new();
-    for (param, arg) in template.type_params.iter().zip(type_args.iter()) {
-        subst.insert((*param).to_string(), arg.clone());
-    }
-
-    let mut items = (template.ir_constructor)();
-    ir::substitute_items(&mut items, &subst);
-
-    let instance_name = if mangled_type_args.is_empty() {
-        template.name.to_string()
-    } else {
-        let mut components: Vec<&str> = Vec::with_capacity(1 + mangled_type_args.len());
-        components.push(template.name);
-        for s in mangled_type_args {
-            components.push(s.as_str());
-        }
-        ir::mangle(&components)
-    };
-    if instance_name != template.name {
-        ir::rename_items(&mut items, template.name, &instance_name);
-    }
-    out.extend(items);
-
-    Ok(())
 }
 
 // ===== Texture helpers =====
@@ -1748,178 +1114,6 @@ fn texture_depth_view_dimension(kind: ir::TextureDepthKind) -> wgpu::TextureView
         ir::TextureDepthKind::DepthCube => wgpu::TextureViewDimension::Cube,
         ir::TextureDepthKind::DepthCubeArray => wgpu::TextureViewDimension::CubeArray,
     }
-}
-
-// ===== WGSL §14.4.1 type sizing =====
-
-/// Returns the byte size of a host-shareable WGSL type per §14.4.1.
-/// `RuntimeArray<T>` returns `0` (caller chooses the buffer size based
-/// on workload). User struct lookups require the defining module.
-///
-/// Returns `0` for non-shareable types (samplers, textures, pointers) and
-/// for unresolvable cases (e.g. an array length that isn't a literal or
-/// same-module const). In the latter case a panic with location info
-/// would be more user-friendly, but we err on the side of "do something
-/// reasonable" so that callers can still build pipelines.
-pub fn type_byte_size(ty: &ir::Type, module: &ir::Module) -> u64 {
-    let layout = type_layout(ty, module);
-    layout.size
-}
-
-fn type_byte_size_or_zero(ty: &ir::Type, module: &ir::Module) -> u64 {
-    type_byte_size(ty, module)
-}
-
-/// Layout for a single type (size + align) per WGSL §14.4.1.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TypeLayout {
-    pub size: u64,
-    pub align: u64,
-}
-
-fn align_up(val: u64, align: u64) -> u64 {
-    if align == 0 {
-        val
-    } else {
-        (val + (align - 1)) & !(align - 1)
-    }
-}
-
-fn type_layout(ty: &ir::Type, module: &ir::Module) -> TypeLayout {
-    match ty {
-        ir::Type::Scalar(s) => scalar_layout(*s),
-        ir::Type::Vector { elements, .. } => vector_layout(*elements),
-        ir::Type::Matrix { columns, rows, .. } => matrix_layout(*columns, *rows),
-        ir::Type::Array { elem, len } => {
-            let inner = type_layout(elem, module);
-            let n = eval_array_len(len, module).unwrap_or(0);
-            TypeLayout {
-                size: (n as u64) * align_up(inner.size, inner.align.max(1)),
-                align: inner.align,
-            }
-        }
-        ir::Type::RuntimeArray { elem } => {
-            let inner = type_layout(elem, module);
-            TypeLayout {
-                size: 0,
-                align: inner.align,
-            }
-        }
-        ir::Type::Atomic { elem } => type_layout(elem, module),
-        ir::Type::Struct { name, type_args } => struct_layout(name, type_args, module),
-        ir::Type::Ptr { .. } => TypeLayout { size: 0, align: 1 },
-        // Samplers, textures, and type parameters aren't host-shareable.
-        // Return a zero layout so the analyzer doesn't choke.
-        ir::Type::Sampler
-        | ir::Type::SamplerComparison
-        | ir::Type::Texture { .. }
-        | ir::Type::TextureDepth { .. }
-        | ir::Type::TextureStorage { .. }
-        | ir::Type::TypeParam { .. }
-        | ir::Type::Phantom { .. }
-        | ir::Type::AssocType { .. } => TypeLayout { size: 0, align: 1 },
-    }
-}
-
-fn scalar_layout(s: ir::ScalarType) -> TypeLayout {
-    match s {
-        ir::ScalarType::F32 | ir::ScalarType::I32 | ir::ScalarType::U32 | ir::ScalarType::Bool => {
-            TypeLayout { size: 4, align: 4 }
-        }
-    }
-}
-
-fn vector_layout(elements: u8) -> TypeLayout {
-    match elements {
-        2 => TypeLayout { size: 8, align: 8 },
-        3 => TypeLayout {
-            size: 12,
-            align: 16,
-        },
-        4 => TypeLayout {
-            size: 16,
-            align: 16,
-        },
-        _ => TypeLayout { size: 0, align: 1 },
-    }
-}
-
-fn matrix_layout(columns: u8, rows: u8) -> TypeLayout {
-    // WGSL §14.4.1: matCxR<T> has:
-    //   Align = AlignOf(vecR<T>)
-    //   Size  = SizeOf(array<vecR<T>, C>)
-    // Each column is stored as a vecR<T> with stride roundUp(SizeOf(vecR<T>),
-    // AlignOf(vecR<T>)).
-    let row_vec = vector_layout(rows);
-    let stride = align_up(row_vec.size, row_vec.align);
-    TypeLayout {
-        size: (columns as u64) * stride,
-        align: row_vec.align,
-    }
-}
-
-fn struct_layout(name: &str, type_args: &[ir::Type], module: &ir::Module) -> TypeLayout {
-    let Some(s) = find_struct(name, type_args, module) else {
-        return TypeLayout { size: 0, align: 1 };
-    };
-    let mut offset: u64 = 0;
-    let mut struct_align: u64 = 1;
-    for field in &s.fields {
-        let fl = type_layout(&field.ty, module);
-        struct_align = struct_align.max(fl.align);
-        offset = align_up(offset, fl.align);
-        offset += fl.size;
-    }
-    let size = align_up(offset, struct_align);
-    TypeLayout {
-        size,
-        align: struct_align,
-    }
-}
-
-/// Look up a struct by name (and optional type args) in the module. The
-/// struct is matched by base name; type args are currently ignored for
-/// lookup (we look up the generic template, then resolve via the
-/// `type_args` substitution if any). Generic structs share a base name
-/// across instantiations, so callers that need a specific instantiation
-/// must pre-substitute the IR before calling.
-fn find_struct<'a>(
-    name: &str,
-    _type_args: &[ir::Type],
-    module: &'a ir::Module,
-) -> Option<&'a ir::ItemStruct> {
-    module.items.iter().find_map(|i| match i {
-        ir::Item::Struct(s) if s.name == name => Some(s),
-        _ => None,
-    })
-}
-
-/// Evaluate a fixed-size array length expression. Supports integer
-/// literals and named integer constants defined at module scope. Other
-/// expressions (binary ops, casts, etc.) return `None` and the caller
-/// falls back to size 0 with a clearly-too-small buffer.
-fn eval_array_len(expr: &ir::Expr, module: &ir::Module) -> Option<usize> {
-    match expr {
-        ir::Expr::Lit(ir::Lit::Int { digits, .. }) => digits.parse::<usize>().ok(),
-        // WGSL array lengths must be non-negative const expressions, so a
-        // unary negation is unresolvable — returning `None` falls back to
-        // size 0 rather than producing a huge (wraparound) length.
-        ir::Expr::Unary {
-            op: ir::UnOp::Neg, ..
-        } => None,
-        ir::Expr::Ident(name) => {
-            let val = module.items.iter().find_map(|i| match i {
-                ir::Item::Const(c) if c.name == *name => Some(eval_const_int(&c.expr, module)),
-                _ => None,
-            });
-            val.flatten()
-        }
-        _ => None,
-    }
-}
-
-fn eval_const_int(expr: &ir::Expr, module: &ir::Module) -> Option<usize> {
-    eval_array_len(expr, module)
 }
 
 #[cfg(test)]

@@ -36,8 +36,7 @@ use wgsl_rs_linkage_wgpu::v29::analyze_wgsl_module;
 
 Both majors may be enabled at once (feature unification); the modules
 coexist with distinct, incompatible wgpu types, and the crate root
-re-exports the latest (the root is intentionally absent in a pinned
-vNN-only build).
+re-exports the latest enabled major.
 
 See [Cargo Features](../getting-started/cargo-features.md).
 
@@ -150,7 +149,7 @@ pipeline-construction time.
 ## Migrating from the `linkage-wgpu` feature
 
 Earlier betas shipped linkage inside `wgsl-rs` behind a `linkage-wgpu`
-cargo feature. It now lives in its own crates so users on different wgpu
+cargo feature. It now lives in its own crate so users on different wgpu
 majors can each get matching types. To migrate:
 
 1. Remove the `linkage-wgpu` feature from your `wgsl-rs` dependency.

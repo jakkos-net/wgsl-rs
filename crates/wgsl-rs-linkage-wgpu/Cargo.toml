@@ -10,14 +10,35 @@ keywords = ["wgsl", "wgpu", "shader", "gpu"]
 categories = ["graphics", "game-development"]
 
 [features]
-default = ["v30"]
-v29 = ["dep:wgsl-rs-linkage-wgpu-v29"]
-v30 = ["dep:wgsl-rs-linkage-wgpu-v30"]
+# One feature per supported wgpu major. The default tracks the latest;
+# older majors are opt-in so users only compile the wgpu they use
+# (wgpu is minutes of build time).
+default = ["v30", "validation"]
+v29 = ["dep:wgpu29"]
+v30 = ["dep:wgpu30"]
+# Forward to wgsl-rs's own validation feature, which provides
+# `wgsl_rs::validate_wgsl_source` (used by `IrModuleExt::validate`).
+# Default-on to match wgsl-rs, where validation has always been a
+# default feature.
+validation = ["wgsl-rs/validation"]
 
 [dependencies]
-wgsl-rs-linkage-wgpu-v29 = { version = "0.1.0-beta.4", path = "../wgsl-rs-linkage-wgpu-v29", optional = true }
-wgsl-rs-linkage-wgpu-v30 = { version = "0.1.0-beta.4", path = "../wgsl-rs-linkage-wgpu-v30", optional = true }
+snafu.workspace = true
+# default-features = false: this crate's own `validation` feature is
+# the sole forwarding path, so `--no-default-features` builds stay lean
+# (no naga validation, no rayon dispatch runtime).
+wgsl-rs = { version = "0.1.0-beta.4", path = "../wgsl-rs", default-features = false }
+wgsl-rs-ir = { version = "0.1.0-beta.4", path = "../wgsl-rs-ir" }
+# Renamed per-major entries: cargo resolves semver-incompatible majors
+# as distinct graph nodes, so the features above can select between
+# them. Local (non-workspace) pins: the workspace `wgpu` entry tracks
+# the latest major for app crates.
+wgpu29 = { package = "wgpu", version = "29", optional = true }
+wgpu30 = { package = "wgpu", version = "30", optional = true }
+
+[dev-dependencies]
+futures = { workspace = true }
 
 [package.metadata.docs.rs]
-# Document both the v29 and v30 modules.
+# Document the v29 and v30 modules alongside the analysis core.
 all-features = true

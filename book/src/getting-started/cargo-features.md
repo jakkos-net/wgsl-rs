@@ -33,8 +33,8 @@ Use this when writing tests that exercise fragment shaders without spinning up a
 ## Linkage: a separate crate
 
 wgpu linkage generation used to live behind a `linkage-wgpu` feature. It now
-lives in the separate `wgsl-rs-linkage-wgpu` crate (compiled against each
-supported wgpu major), because the linkage output is wgpu types that do not
+lives in the separate `wgsl-rs-linkage-wgpu` crate (one feature per supported
+wgpu major), because the linkage output is wgpu types that do not
 interop across majors:
 
 ```toml

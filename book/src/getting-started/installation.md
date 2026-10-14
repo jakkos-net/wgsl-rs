@@ -40,7 +40,7 @@ The `validation` feature is enabled by default and pulls in [naga](https://githu
 | `dispatch-runtime` | on      | CPU-side fragment dispatch runtime for roundtrip testing.          |
 
 wgpu linkage generation is not a cargo feature: it lives in the separate
-`wgsl-rs-linkage-wgpu` crate, compiled against each supported wgpu major.
+`wgsl-rs-linkage-wgpu` crate, with one cargo feature per supported wgpu major.
 
 See [Cargo Features](./cargo-features.md) for details on each.
 
