@@ -101,7 +101,7 @@ See [Bind Groups & Buffers](./bind-groups.md) and
 ```rust
 use wgsl_rs_linkage_wgpu::*;
 
-let mut linkage = analyze_wgsl_module(&my_shader::SOURCE)?;
+let mut linkage = analyze_wgsl_module(&my_shader::WGSL_SOURCE)?;
 let shader = linkage.shader_module(&device);
 
 let frame_bg = linkage.create_bind_group_named(0, &device, &[

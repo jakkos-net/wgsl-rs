@@ -42,16 +42,19 @@ so recovery there is ordinary `Option` handling. Only analysis and
 named-resource bind group creation return `Error`:
 
 ```rust
-use wgsl_rs_linkage_wgpu::{analyze_wgsl_module, Error};
+use wgsl_rs_linkage_wgpu::{analyze_ir_module, analyze_wgsl_module, Error};
 
 // Analysis is the only source of `TemplateResolution`: instantiate the
 // template with concrete types first, then analyze the concrete IR.
-match analyze_wgsl_module(&my_shader::WGSL_SOURCE) {
-    Ok(linkage) => { /* build pipelines */ }
+let linkage = match analyze_wgsl_module(&my_shader::WGSL_SOURCE) {
+    Ok(linkage) => linkage,
     Err(Error::TemplateResolution { .. }) => {
-        let linkage = analyze_ir_module(my_shader::instantiate::<f32, u32>());
+        // The source is a template: instantiate it with concrete types,
+        // then analyze the concrete IR instead.
+        analyze_ir_module(my_shader::instantiate::<f32, u32>())
     }
-}
+    Err(other) => return Err(other),
+};
 
 // Named-resource bind group creation surfaces the binding-name variants:
 match linkage.create_bind_group_named(0, &device, &[("FRAME", binding)]) {

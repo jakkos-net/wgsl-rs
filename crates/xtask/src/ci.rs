@@ -94,10 +94,19 @@ impl CiAction {
                 }
                 // Each supported major's version crate directly, plus the
                 // facade at both its default (latest) and pinned-vNN
-                // feature combinations. wgpu majors do not interop, so
+                // feature combinations, plus each version crate's lean
+                // no-validation mode. wgpu majors do not interop, so
                 // every buildable configuration must stay green.
                 cmd("cargo", "test -p wgsl-rs-linkage-wgpu-v29");
                 cmd("cargo", "test -p wgsl-rs-linkage-wgpu-v30");
+                cmd(
+                    "cargo",
+                    "test -p wgsl-rs-linkage-wgpu-v29 --no-default-features",
+                );
+                cmd(
+                    "cargo",
+                    "test -p wgsl-rs-linkage-wgpu-v30 --no-default-features",
+                );
                 cmd("cargo", "test -p wgsl-rs-linkage-wgpu");
                 cmd(
                     "cargo",

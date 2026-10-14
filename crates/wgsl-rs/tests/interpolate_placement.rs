@@ -11,6 +11,10 @@
 //! starts rejecting any of them (e.g. fragment outputs), this test
 //! fails and the emission must become stage-aware.
 
+// Every test here runs through `wgsl_rs::validate_wgsl_source`, which
+// only exists with the `validation` feature.
+#![cfg(feature = "validation")]
+
 use wgsl_rs::validate_wgsl_source;
 
 fn check(name: &str, src: &str) {
