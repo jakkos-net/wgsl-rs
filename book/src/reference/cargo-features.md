@@ -13,6 +13,7 @@
 |---------|----------|----------------------------------------------------------------------|
 | `v29`   | No       | Linkage compiled against wgpu 29 (module `wgsl_rs_linkage_wgpu::v29`) |
 | `v30`   | Yes      | Linkage compiled against wgpu 30 (module `wgsl_rs_linkage_wgpu::v30`, also re-exported at the crate root) |
+| `validation` | Yes  | Forwards to `wgsl-rs`'s `validation` feature (naga WGSL validation) |
 
 ## `wgsl-rs-layout`
 

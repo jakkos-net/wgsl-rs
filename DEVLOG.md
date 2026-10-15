@@ -1680,3 +1680,62 @@ renderer now emits it explicitly whenever the source omits it (WGSL
 §13.3.1.4 requires it; valid on wgpu 29 too), and the workspace `naga`
 dependency tracks the latest wgpu's naga so CPU-side validation matches
 what devices enforce.
+
+### 2026-10-15: One linkage crate, per-major adapter modules
+
+**Problem.** The 2026-10-14 versioned-crate design (three crates:
+`wgsl-rs-linkage-wgpu-v29`, `-v30`, plus a facade) served its purpose
+but costs at every release: three crates to version and publish in
+lockstep, two byte-identical 2,255-line template copies guarded by a
+CI drift check, and a new crates.io name per future wgpu major. None
+of the three are published yet, and beta.5 is the first publish:
+crates.io names are permanent, so the only cheap window to collapse
+the structure is before that publish, not after.
+
+**Decision.** One crate, `wgsl-rs-linkage-wgpu`, with a feature per
+supported major and a renamed optional dependency per major:
+
+- `wgpu29 = { package = "wgpu", version = "29", optional = true }` and
+  `wgpu30 = { package = "wgpu", version = "30", optional = true }`;
+  features `v29 = ["dep:wgpu29"]`, `v30 = ["dep:wgpu30"]`, default
+  `["v30", "validation"]`.
+- The wgpu-free core (errors, IR assembly, WGSL §14.4.1 sizing, binding
+  metadata, and the #177 stage analysis) lives in `src/analysis.rs`,
+  compiled exactly once; a bare `--no-default-features` build contains
+  zero wgpu.
+- The wgpu-facing adapter lives in one shared `src/linkage.rs`,
+  textually included (`include!`) into each feature-gated `vNN` module
+  with that major's `wgpu` aliased in scope
+  (`pub use wgpu29 as wgpu;`). The core module is named `analysis`, not
+  `core`, because the adapter contains `impl core::fmt::Display` and a
+  crate-root `core` module would shadow the `core` crate into an
+  ambiguity error.
+- The crate root re-exports the latest enabled major (v30 when both are
+  enabled; the pinned major in a vNN-only build).
+
+**Why this supersedes the 2026-10-14 rationale.** That entry ruled out
+cargo features selecting a dependency's version. That is true for a
+single dependency entry; but two renamed entries are distinct graph
+nodes, and features select between them fine (the standard multi-version
+optional-dependency pattern). The cross-crate `#[path]` include that
+failed registry packaging is gone entirely: the new `include!` is
+intra-crate, and `src/linkage.rs` ships in the package tarball like any
+other source file.
+
+**Policy.** A new wgpu major is a feature plus a renamed dependency
+entry, not a new crate. The fork-on-divergence policy stays: when a
+major's API genuinely diverges, that `vNN` module includes its own
+adapter file and drops the shared include for that module only (first
+known divergence: wgpu 30's
+`RequestAdapterOptions::apply_limit_buckets`, in test code only). CI
+(`cargo xtask ci linkage-matrix`) now asserts, per feature combination,
+both the tests and the exact wgpu majors resolved in the dependency
+tree. Consumers are unaffected: same crate name, same features, same
+import paths.
+
+**De-dupe.** The byte-identical template copies are gone: exactly one
+copy of every linkage line exists in-tree. The per-binding stage
+analysis produces a wgpu-free `Stages` set (compiled and unit-tested
+once, even in the bare build); the adapter maps it to
+`wgpu::ShaderStages`, preserving the documented COMPUTE default for
+unreferenced bindings.

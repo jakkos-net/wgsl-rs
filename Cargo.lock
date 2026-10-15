@@ -4077,26 +4077,9 @@ dependencies = [
 name = "wgsl-rs-linkage-wgpu"
 version = "0.1.0-beta.4"
 dependencies = [
- "wgsl-rs-linkage-wgpu-v29",
- "wgsl-rs-linkage-wgpu-v30",
-]
-
-[[package]]
-name = "wgsl-rs-linkage-wgpu-v29"
-version = "0.1.0-beta.4"
-dependencies = [
- "snafu",
- "wgpu 29.0.2",
- "wgsl-rs",
- "wgsl-rs-ir",
-]
-
-[[package]]
-name = "wgsl-rs-linkage-wgpu-v30"
-version = "0.1.0-beta.4"
-dependencies = [
  "futures",
  "snafu",
+ "wgpu 29.0.2",
  "wgpu 30.0.1",
  "wgsl-rs",
  "wgsl-rs-ir",

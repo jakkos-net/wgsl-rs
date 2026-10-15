@@ -2,8 +2,8 @@
 //!
 //! ## wgpu linkage
 //! Runtime wgpu linkage analysis lives outside this crate, in the
-//! `wgsl-rs-linkage-wgpu` facade (one crate per supported wgpu major:
-//! `wgsl-rs-linkage-wgpu-v29`, `-v30`, ...). The runtime analyzer walks
+//! `wgsl-rs-linkage-wgpu` crate (one feature per supported wgpu
+//! major). The runtime analyzer walks
 //! the IR produced by a `#[wgsl]` source (post-instantiation for
 //! templates) and produces bind group layouts, pipeline state
 //! descriptors, and buffer descriptors without any compile-time code

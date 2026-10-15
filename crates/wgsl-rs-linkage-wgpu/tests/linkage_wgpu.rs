@@ -1,18 +1,23 @@
 //! Integration tests for the runtime wgpu linkage analyzer.
 //!
-//! These tests exercise `wgsl_rs_linkage_wgpu_v30::analyze_wgsl_module` and
-//! `analyze_module` against small `#[wgsl]` modules. They don't require
-//! a GPU; they inspect the produced `WgpuLinkage` and assert on its
+//! These tests exercise `wgsl_rs_linkage_wgpu::v30::analyze_wgsl_module`
+//! and `analyze_ir_module` against small `#[wgsl]` modules. Most don't
+//! require a GPU; the device-backed ones early-return when none is
+//! available. They inspect the produced `WgpuLinkage` and assert on its
 //! shape and the buffer sizes computed from WGSL §14.4.1.
 //!
-//! (The same tests compile against wgpu 29 too: the v29 crate builds
-//! this crate's lib source, and its own template unit tests run under
-//! both majors.)
+//! The suite targets the wgpu 30 adapter specifically (the
+//! `apply_limit_buckets` adapter option is a wgpu 30 API), so it only
+//! compiles when the `v30` feature is enabled. The adapter itself,
+//! `src/linkage.rs`, is shared by every supported major; the v29 path
+//! is exercised by the adapter unit tests and the linkage-matrix
+//! feature combinations in CI.
+#![cfg(feature = "v30")]
 
 use wgsl_rs::ir::{self, FnAttrs, StorageAccess, TextureDepthKind, TextureKind};
 #[allow(unused_imports)]
 use wgsl_rs::wgsl;
-use wgsl_rs_linkage_wgpu_v30::{self as wg, IrModuleExt};
+use wgsl_rs_linkage_wgpu::v30::{self as wg, IrModuleExt};
 
 // ===== Test modules =====
 
@@ -260,7 +265,7 @@ fn shader_module_descriptor_borrows_module_label() {
     let desc = linkage.shader_module_descriptor();
     assert!(matches!(
         desc.source,
-        wgpu::ShaderSource::Wgsl(_) // imported via test crate
+        wg::wgpu::ShaderSource::Wgsl(_) // imported via test crate
     ));
     // The label is a &'static str borrowed from the linkage's module_label.
     assert_eq!(desc.label, Some("triangle"));
@@ -577,8 +582,8 @@ fn analyze_binding_filterability_flags() {
     assert!(
         matches!(
             bg.entries[0].ty,
-            wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            wg::wgpu::BindingType::Texture {
+                sample_type: wg::wgpu::TextureSampleType::Float { filterable: false },
                 ..
             }
         ),
@@ -588,8 +593,8 @@ fn analyze_binding_filterability_flags() {
     assert!(
         matches!(
             bg.entries[1].ty,
-            wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            wg::wgpu::BindingType::Texture {
+                sample_type: wg::wgpu::TextureSampleType::Float { filterable: true },
                 ..
             }
         ),
@@ -599,7 +604,7 @@ fn analyze_binding_filterability_flags() {
     assert!(
         matches!(
             bg.entries[2].ty,
-            wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering)
+            wg::wgpu::BindingType::Sampler(wg::wgpu::SamplerBindingType::NonFiltering)
         ),
         "expected `NonFiltering` for the `, unfilterable` sampler, got {:?}",
         bg.entries[2].ty
@@ -607,7 +612,7 @@ fn analyze_binding_filterability_flags() {
     assert!(
         matches!(
             bg.entries[3].ty,
-            wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)
+            wg::wgpu::BindingType::Sampler(wg::wgpu::SamplerBindingType::Filtering)
         ),
         "expected `Filtering` without the modifier, got {:?}",
         bg.entries[3].ty
@@ -615,7 +620,7 @@ fn analyze_binding_filterability_flags() {
     assert!(
         matches!(
             bg.entries[4].ty,
-            wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison)
+            wg::wgpu::BindingType::Sampler(wg::wgpu::SamplerBindingType::Comparison)
         ),
         "expected `Comparison` unchanged, got {:?}",
         bg.entries[4].ty
@@ -760,17 +765,17 @@ fn compute_workgroup_size_defaults_to_one() {
 
 // ===== create_named: error and happy-path tests =====
 
-/// Helper: returns a `wgpu::Device` for tests, or `None` if no GPU is
+/// Helper: returns a `wg::wgpu::Device` for tests, or `None` if no GPU is
 /// available. Tests that need a real device (the happy-path
 /// `create_named` test) should early-return when this is `None`.
-fn test_device() -> Option<wgpu::Device> {
+fn test_device() -> Option<wg::wgpu::Device> {
     use futures::executor::block_on;
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::all(),
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
+    let instance = wg::wgpu::Instance::new(wg::wgpu::InstanceDescriptor {
+        backends: wg::wgpu::Backends::all(),
+        ..wg::wgpu::InstanceDescriptor::new_without_display_handle()
     });
-    let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::default(),
+    let adapter = block_on(instance.request_adapter(&wg::wgpu::RequestAdapterOptions {
+        power_preference: wg::wgpu::PowerPreference::default(),
         compatible_surface: None,
         force_fallback_adapter: false,
         // wgpu 30 added limit bucketing; keep historical adapter
@@ -779,7 +784,7 @@ fn test_device() -> Option<wgpu::Device> {
     }))
     .ok()?;
     let (device, _queue) =
-        block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).ok()?;
+        block_on(adapter.request_device(&wg::wgpu::DeviceDescriptor::default())).ok()?;
     Some(device)
 }
 
@@ -807,11 +812,11 @@ fn linkage_with_two_uniforms() -> wg::WgpuLinkage {
     ir_module.generate_linkage()
 }
 
-fn make_uniform_buffer(device: &wgpu::Device, label: &str) -> wgpu::Buffer {
-    device.create_buffer(&wgpu::BufferDescriptor {
+fn make_uniform_buffer(device: &wg::wgpu::Device, label: &str) -> wg::wgpu::Buffer {
+    device.create_buffer(&wg::wgpu::BufferDescriptor {
         label: Some(label),
         size: 4,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        usage: wg::wgpu::BufferUsages::UNIFORM | wg::wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     })
 }
@@ -1071,7 +1076,7 @@ fn bind_group_layout_is_idempotent() {
     let first = linkage
         .bind_group_layout(0, &device)
         .expect("group 0 layout should exist");
-    // Second call returns a clone; the wgpu::BindGroupLayout is
+    // Second call returns a clone; the wg::wgpu::BindGroupLayout is
     // Arc-backed, so this is a cheap refcount bump, not a rebuild.
     let second = linkage
         .bind_group_layout(0, &device)
