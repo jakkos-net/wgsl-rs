@@ -1,6 +1,6 @@
 [package]
 name = "wgsl-rs-layout"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 edition = "2024"
 description = "WGSL memory layout for wgsl-rs: WgslLayout and #[derive(Layout)] so CPU structs match GPU buffer layouts."
 license = "MIT"
@@ -13,8 +13,8 @@ default = []
 doc-diagrams = ["dep:snafu"]
 
 [dependencies]
-wgsl-rs = { version = "0.1.0-beta.4", path = "../wgsl-rs" }
-wgsl-rs-layout-macros = { version = "0.1.0-beta.4", path = "../wgsl-rs-layout-macros" }
+wgsl-rs = { version = "0.1.0-beta.5", path = "../wgsl-rs" }
+wgsl-rs-layout-macros = { version = "0.1.0-beta.5", path = "../wgsl-rs-layout-macros" }
 snafu = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
