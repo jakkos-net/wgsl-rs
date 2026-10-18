@@ -20,7 +20,7 @@ This means extensions see the fully constructed IR but operate before any type-p
 
 ```rust
 pub struct Module {
-    pub name: String,
+    pub name: &'static str,
     pub items: Vec<Item>,
     pub attrs: Vec<Attribute>,
 }
