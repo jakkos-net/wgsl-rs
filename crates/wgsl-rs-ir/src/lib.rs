@@ -25,6 +25,7 @@
 pub mod deshadow;
 pub mod mangle;
 pub mod render;
+pub mod static_ir;
 mod substitute;
 pub mod suffix;
 mod types;

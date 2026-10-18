@@ -6,6 +6,7 @@
 |---------------------|----------|----------------------------------------------------------------------------|
 | `validation`        | Yes      | Compile-time WGSL validation of generated source                           |
 | `dispatch-runtime`  | Yes      | Enable runtime dispatch support                                            |
+| `fast-compile`      | Yes      | Emit each module's IR as static data plus a tiny conversion shim, instead of a runtime constructor function; keeps incremental rebuilds of big `#[wgsl]` modules fast |
 
 ## `wgsl-rs-linkage-wgpu`
 
@@ -21,11 +22,33 @@
 |-----------------|----------|-------------------------------------------------------------------|
 | `doc-diagrams`  | No       | Enable `generate_svg` for byte-layout SVG diagrams                |
 
+## Emission Modes: `fast-compile`
+
+`fast-compile` (on by default) makes the `#[wgsl]` macro emit a
+module's IR as static data together with a small function that
+converts it when needed. Without the feature the macro emits a
+constructor function that builds the IR step by step; for large
+shader modules that constructor is enormous and slows down every
+incremental rebuild.
+
+Opting out is possible, but only for the whole build graph:
+
+```toml
+[dependencies]
+wgsl-rs = { version = "0.1", default-features = false, features = ["validation", "dispatch-runtime"] }
+```
+
+Cargo unifies features across the dependency graph: if *any* crate in
+your build keeps `wgsl-rs`'s default features, `fast-compile` stays on
+for every crate in that build. Opting out therefore requires every
+crate in the graph to opt out. Libraries should not force either
+mode; let the final application choose.
+
 ## Usage
 
 ```toml
 [dependencies]
-wgsl-rs = { version = "0.1", default-features = false, features = ["validation"] }
+wgsl-rs = { version = "0.1", default-features = false, features = ["validation", "dispatch-runtime"] }
 wgsl-rs-linkage-wgpu = "0.1" # default: latest wgpu major
 wgsl-rs-layout = { version = "0.1", features = ["doc-diagrams"] }
 ```

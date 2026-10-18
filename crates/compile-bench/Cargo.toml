@@ -1,0 +1,22 @@
+[package]
+name = "compile-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+# The bench measures both macro emission paths (wgsl-rs#221): `fast`
+# builds with the static-IR data emission; `--no-default-features`
+# builds the legacy constructor-function path. The modes are only
+# clean in isolated `-p compile-bench` invocations, which is how the
+# xtask bench driver runs them: a whole-workspace build unifies
+# features and would turn `fast` back on everywhere.
+default = ["fast"]
+fast = ["wgsl-rs/fast-compile"]
+
+[dependencies]
+# Default features are off so the `fast` feature is the only switch
+# between emission modes; validation and dispatch-runtime stay on in
+# both modes to keep the measured builds comparable with the recorded
+# baseline.
+wgsl-rs = { path = "../wgsl-rs", default-features = false, features = ["validation", "dispatch-runtime"] }

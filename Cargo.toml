@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/compile-bench",
   "crates/example",
   "crates/fbm-example",
   "crates/gpu-tests",

@@ -2,6 +2,7 @@
 
 use clap::Parser;
 
+mod bench;
 mod ci;
 mod help;
 mod wgsl_spec;
@@ -24,6 +25,12 @@ enum Commands {
         #[command(subcommand)]
         action: ci::CiAction,
     },
+    /// Measure incremental compile time of big `#[wgsl]` shader mods
+    /// (wgsl-rs#221).
+    Bench {
+        #[command(subcommand)]
+        action: Option<bench::BenchAction>,
+    },
 }
 
 fn main() {
@@ -33,5 +40,6 @@ fn main() {
     match cli.command {
         Commands::WgslSpec { action } => action.run(),
         Commands::Ci { action } => action.run(),
+        Commands::Bench { action } => action.unwrap_or(bench::BenchAction::Run).run(),
     }
 }

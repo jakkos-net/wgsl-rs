@@ -1739,3 +1739,93 @@ analysis produces a wgpu-free `Stages` set (compiled and unit-tested
 once, even in the bare build); the adapter maps it to
 `wgpu::ShaderStages`, preserving the documented COMPUTE default for
 unreferenced bindings.
+
+### 2026-10-18: Static IR data replaces the runtime IR constructor function (wgsl-rs#221)
+
+**Problem:** The macro emitted each module's IR as a Rust *function*
+(`__wgsl_module_ctor`) that constructed the `ir::Module`
+expression-by-expression at runtime. A ~1000-line shader expands to a
+~12,000-line ctor; at `opt-level=1` (the common dev setting for
+projects too slow to run unoptimized) LLVM spent ~14s per incremental
+rebuild, ~13.9s of it in thinlto. Every edit inside or above the
+`#[wgsl]` mod retriggered it, as did any change shifting the mod's
+spans.
+
+**Decision:** Emit the IR as *data, not code*. `wgsl-rs-ir` gained a
+lifetime-generic borrowed mirror of its owned types
+(`ir::static_ir::StaticX<'a>`: `String` becomes `&str`, `Vec<T>`
+becomes `&[T]`, `Box<T>` becomes `&T`; the 19 IR types that are pure
+const data are reused rather than mirrored). The macro emits a static
+literal of the mirror plus a slim shim that converts to the owned IR
+with plain `From` impls. All heavy code lives once in `wgsl-rs-ir`;
+the per-module expansion is only data. Extensions still run in the
+ctor: the shim converts, then calls `modify_ir`, preserving run order
+and the extension contract.
+
+**Why this bridge:** three candidates were on the table. Serde plus
+bincode/postcard is the least code, but the decoder would force serde
+and a format crate as transitive deps on every user; vetoed. A
+hand-rolled binary codec is dependency-free, but a desync between
+encoder and decoder reaches users as a *runtime panic* in their
+shader. The static-mirror bridge is dependency-free *and* rustc
+checked: the macro's owned-to-mirror emission matches every IR enum
+exhaustively, and the mirror's fields are type-checked against the
+real types, so a bridge mistake is a compile error in this workspace,
+never a user bug.
+
+**Bench:** `cargo xtask bench` (new `compile-bench` crate with the
+psrdnoise3 mvp fixture, opt-level=1, medians of N=3) went from ~14.6s
+per incremental rebuild, on both retrigger modes listed in the issue,
+to 0.60s (edit inside the mod) and 0.43s (line above the mod). jak's
+mvp serde experiment predicted the magnitude; the shipped bridge
+achieves it without the dependency.
+
+**Tests:** `static_ir` kitchen-sink round-trip (every mirrored
+variant, every variant of every reused enum, both conversion
+directions, exact equality, plus an independent hand-written literal
+test); full suite plus roundtrip 142/142 green in both emission modes.
+
+### 2026-10-18: `fast-compile` is default-on; the ctor path is a rollback off-state
+
+**Problem:** A new emission path should not ship behind an opt-in
+flag (opt-in fixes never reach users), but it is also brand-new and
+needs an escape hatch if it misbehaves in the wild.
+
+**Decision:** The static-IR emission is selected by a `fast-compile`
+feature, default-on in `wgsl-rs` (forwarded to `wgsl-rs-macros`).
+Opting out requires `default-features = false` plus re-enabling the
+wanted defaults, and is only meaningful whole-build-graph: cargo
+feature unification means one crate keeping the defaults turns the
+feature back on everywhere. The legacy constructor emission stays
+fully functional as the off-state. Plan: once a release cycle proves
+the new path out, delete the fallback and make the static emission
+unconditional. The book's Cargo Features reference documents the
+feature and the unification caveat.
+
+### 2026-10-18: Deterministic module ids: content hash replaces the counter (wgsl-rs#221)
+
+**Problem:** `MODULE_ID` came from a per-process counter XORed with a
+cargo-identity hash. Adding, removing, or moving any sibling `#[wgsl]`
+mod shifted the ids of every later module in the crate and invalidated
+builds whose source did not change (the second retrigger class in
+wgsl-rs#221).
+
+**Decision:** Hash the module's content instead of its allocation
+order. The id is `fnv1a64(unit_identity) ^ fnv1a64(content_descriptor)`,
+where the descriptor is the canonical `ir_emit_static` rendering of the
+module IR plus its imports, templates (including their IR),
+instantiations, and module type params. Reusing the static emission as
+the hash input avoids maintaining a third traversal of the IR.
+
+The cargo-unit-identity mixing (wgsl-rs#165 rationale) stays: without
+it, byte-identical modules in different crates would share an id and
+assembly dedup would drop one, even though their `crate::`-relative
+imports resolve to different sources. Within one unit, exact
+counter-based uniqueness is traded for determinism: distinct content
+yields distinct ids probabilistically (~2^-64 per pair), and identical
+content shares an id, which is safe because such modules are
+interchangeable in assembly.
+
+**Tests:** determinism and identical-content-same-id; the wgsl-rs#165
+and PR #173 cross-crate/target/version cases kept; the id-collision
+workspace fixtures and both-mode roundtrips green.
