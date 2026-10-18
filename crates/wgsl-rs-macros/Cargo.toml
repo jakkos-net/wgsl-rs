@@ -16,6 +16,12 @@ rust-version = "1.87"
 # remaining reference to it.
 default = ["validation"]
 validation = []
+# Emit the IR as static `static_ir` data plus a slim conversion shim
+# instead of a giant runtime constructor function (wgsl-rs#221).
+# Forwarded from `wgsl-rs`'s default-on `fast-compile` feature; opting
+# out requires disabling it everywhere in the build graph (cargo
+# feature unification).
+fast-compile = []
 
 [lib]
 proc-macro = true

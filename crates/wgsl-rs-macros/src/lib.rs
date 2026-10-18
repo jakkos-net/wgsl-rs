@@ -15,6 +15,7 @@ mod builtins;
 mod deref_validation;
 mod ir_convert;
 mod ir_emit;
+mod ir_emit_static;
 mod load_validation;
 mod module_id;
 mod monomorphize;
@@ -461,49 +462,100 @@ fn gen_wgsl_module(
     let ir_p = ir_path(crate_path);
     let module_name_ident = &wgsl_module.ident;
 
-    // Convert the parse module's items to IR items and emit a constructor
-    // function body that builds the IR at runtime.
+    // Convert the parse module's items to IR items once; both emission
+    // paths consume the same owned IR.
     let ir_items = ir_convert::items_from_parse(&wgsl_module.content).map_err(|e| {
         WgslGenError::WgslParse {
             source: e.into_parse(),
         }
     })?;
-    let module_constructor_body = {
-        let item_exprs: Vec<proc_macro2::TokenStream> = ir_items
-            .iter()
-            .map(|i| ir_emit::emit_item(&ir_p, i))
-            .collect();
-        let module_attrs = ir_emit::emit_attrs(&ir_p, &wgsl_module.attrs);
-        let module_struct = quote! {
-            #ir_p::Module {
-                name: stringify!(#module_name_ident),
-                items: ::std::vec![#(#item_exprs),*],
-                #module_attrs,
-            }
-        };
-        if extensions.is_empty() {
-            module_struct
+
+    let module_ctor_ident = quote::format_ident!("__wgsl_module_ctor");
+
+    // The module IR constructor and, under `fast-compile`, the static
+    // data it reads. `fast-compile` emits the IR as a static literal of
+    // the borrowed `static_ir` mirror plus a slim convert-at-runtime
+    // shim (wgsl-rs#221); the legacy path emits a constructor function
+    // that builds the IR expression-by-expression, which for a large
+    // shader is a ~12,000-line function LLVM spends ~14s on per
+    // incremental rebuild at opt-level=1.
+    let (module_ctor, module_statics): (proc_macro2::TokenStream, proc_macro2::TokenStream) =
+        if cfg!(feature = "fast-compile") {
+            let ir_module = wgsl_rs_ir::Module {
+                name: Box::leak(module_name_ident.to_string().into_boxed_str()),
+                items: ir_items,
+                attrs: wgsl_module.attrs.clone(),
+            };
+            let ir_module_static_ident = quote::format_ident!("__WGSL_IR_MODULE");
+            let data = ir_emit_static::emit_static_module(&ir_p, &ir_module);
+            let ctor_body = if extensions.is_empty() {
+                quote! { #ir_p::Module::from(#ir_module_static_ident) }
+            } else {
+                let extension_calls: Vec<proc_macro2::TokenStream> = extensions
+                    .iter()
+                    .map(|ext_path| {
+                        quote! {
+                            <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
+                        }
+                    })
+                    .collect();
+                quote! {
+                    let mut m = #ir_p::Module::from(#ir_module_static_ident);
+                    #(#extension_calls)*
+                    m
+                }
+            };
+            (
+                quote! {
+                    fn #module_ctor_ident() -> #ir_p::Module { #ctor_body }
+                },
+                quote! {
+                    static #ir_module_static_ident: &#ir_p::static_ir::StaticModule = #data;
+                },
+            )
         } else {
-            let extension_calls: Vec<proc_macro2::TokenStream> = extensions
+            let item_exprs: Vec<proc_macro2::TokenStream> = ir_items
                 .iter()
-                .map(|ext_path| {
-                    quote! {
-                        <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
-                    }
-                })
+                .map(|i| ir_emit::emit_item(&ir_p, i))
                 .collect();
-            quote! {
-                let mut m = #module_struct;
-                #(#extension_calls)*
-                m
-            }
-        }
-    };
+            let module_attrs = ir_emit::emit_attrs(&ir_p, &wgsl_module.attrs);
+            let module_struct = quote! {
+                #ir_p::Module {
+                    name: stringify!(#module_name_ident),
+                    items: ::std::vec![#(#item_exprs),*],
+                    #module_attrs,
+                }
+            };
+            let ctor_body = if extensions.is_empty() {
+                module_struct
+            } else {
+                let extension_calls: Vec<proc_macro2::TokenStream> = extensions
+                    .iter()
+                    .map(|ext_path| {
+                        quote! {
+                            <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
+                        }
+                    })
+                    .collect();
+                quote! {
+                    let mut m = #module_struct;
+                    #(#extension_calls)*
+                    m
+                }
+            };
+            (
+                quote! {
+                    fn #module_ctor_ident() -> #ir_p::Module { #ctor_body }
+                },
+                quote! {},
+            )
+        };
 
     // Generate template entries for generic functions / structs defined in
     // this module. The IR is built lazily by an emitted constructor
     // function.
     let mut template_constructors: Vec<proc_macro2::TokenStream> = Vec::new();
+    let mut template_statics: Vec<proc_macro2::TokenStream> = Vec::new();
     let template_entries: Vec<proc_macro2::TokenStream> = mono_result
         .template_macros
         .iter()
@@ -519,17 +571,34 @@ fn gen_wgsl_module(
                 ir_convert::items_from_parse(&tmpl.items).map_err(|e| WgslGenError::WgslParse {
                     source: e.into_parse(),
                 })?;
-            let body_items: Vec<proc_macro2::TokenStream> = ir_items
-                .iter()
-                .map(|i| ir_emit::emit_item(&ir_p, i))
-                .collect();
-
             let ctor_ident = quote::format_ident!("__wgsl_template_{}_ctor", idx);
-            template_constructors.push(quote! {
-                fn #ctor_ident() -> ::std::vec::Vec<#ir_p::Item> {
-                    ::std::vec![#(#body_items),*]
-                }
-            });
+            if cfg!(feature = "fast-compile") {
+                // Static IR data plus a slim conversion shim; the legacy
+                // path below builds the `vec![...]` constructor body.
+                let static_ident = quote::format_ident!("__wgsl_template_{}", idx);
+                let data = ir_emit_static::emit_static_items(&ir_p, &ir_items);
+                template_statics.push(quote! {
+                    static #static_ident: &[#ir_p::static_ir::StaticItem] = #data;
+                });
+                template_constructors.push(quote! {
+                    fn #ctor_ident() -> ::std::vec::Vec<#ir_p::Item> {
+                        #static_ident
+                            .iter()
+                            .map(|item| #ir_p::Item::from(item))
+                            .collect()
+                    }
+                });
+            } else {
+                let body_items: Vec<proc_macro2::TokenStream> = ir_items
+                    .iter()
+                    .map(|i| ir_emit::emit_item(&ir_p, i))
+                    .collect();
+                template_constructors.push(quote! {
+                    fn #ctor_ident() -> ::std::vec::Vec<#ir_p::Item> {
+                        ::std::vec![#(#body_items),*]
+                    }
+                });
+            }
 
             let dep_entries: Vec<proc_macro2::TokenStream> = tmpl
                 .dependencies
@@ -630,14 +699,14 @@ fn gen_wgsl_module(
     let module_type_params_lits: Vec<&str> =
         module_type_params.iter().map(|s| s.as_str()).collect();
 
-    let module_ctor_ident = quote::format_ident!("__wgsl_module_ctor");
-
     let module_id = module_id::next_module_id();
 
     Ok(quote! {
-        fn #module_ctor_ident() -> #ir_p::Module {
-            #module_constructor_body
-        }
+        #module_statics
+
+        #module_ctor
+
+        #(#template_statics)*
 
         #(#template_constructors)*
 

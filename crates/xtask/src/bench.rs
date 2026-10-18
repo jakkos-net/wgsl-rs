@@ -7,9 +7,17 @@
 //! `#[wgsl]` mod. The measured crate is `compile-bench`, which vendors
 //! the ~900-line psrdnoise3 port from the mvp repo linked in the
 //! issue; at `opt-level=1` its ~12,000-line `__wgsl_module_ctor`
-//! expansion costs ~14s of LLVM time per rebuild.
+//! expansion cost ~14s of LLVM time per rebuild (legacy mode).
 //!
-//! Per mutation mode, the bench runs:
+//! The bench measures **both macro emission paths**:
+//!
+//! * `legacy`: `--no-default-features` builds the constructor-function
+//!   emission, the pre-fix codegen (kept as the rollback off-state of the
+//!   default-on `fast-compile` feature).
+//! * `fast`: the default build, with the IR emitted as static `static_ir` data
+//!   plus a slim conversion shim.
+//!
+//! Per mode and mutation mode, the bench runs:
 //!
 //! 1. one first build (the cold number if the cache is empty)
 //! 2. a few iterations: mutate the shader source deterministically, then time
@@ -28,10 +36,12 @@
 //!   everything below, including the mod, invalidating the expansion even
 //!   though its tokens are unchanged.
 //!
-//! Builds are pinned to `-p compile-bench` so feature unification
-//! across the rest of the workspace cannot blur modes, and the driver
-//! sets `CARGO_PROFILE_DEV_OPT_LEVEL=1` for its own invocations only:
-//! the issue reproduces at `opt-level=1` and the workspace root dev
+//! Builds are pinned to isolated `-p compile-bench` invocations so
+//! workspace-wide feature unification cannot blur the emission modes
+//! (one crate keeping wgsl-rs's defaults turns `fast-compile` on for
+//! the whole graph). The driver sets
+//! `CARGO_PROFILE_DEV_OPT_LEVEL=1` for its own invocations only: the
+//! issue reproduces at `opt-level=1` and the workspace root dev
 //! profile stays untouched.
 //!
 //! Timings are machine-dependent and noisy, so this is a relative
@@ -40,7 +50,7 @@
 
 use std::{path::PathBuf, time::Instant};
 
-/// Incremental rebuilds measured per mutation mode.
+/// Incremental rebuilds measured per mutation mode and emission mode.
 const ITERATIONS: usize = 3;
 
 /// Anchor const in `crates/compile-bench/src/main.rs` whose literal the
@@ -54,7 +64,8 @@ const SPACER_LINE: &str = "// __bench_spacer__";
 
 #[derive(clap::Subcommand)]
 pub enum BenchAction {
-    /// Time first and incremental rebuilds of `compile-bench`.
+    /// Time first and incremental rebuilds of `compile-bench` in both
+    /// emission modes.
     Run,
 }
 
@@ -68,26 +79,34 @@ impl BenchAction {
         println!("profile: dev with opt-level=1 (scoped to this driver)");
         println!();
 
-        let Some(first) = timed_build() else {
-            exit_failed();
-        };
-        println!("first build (cold if cache empty): {first:.2}s");
+        for bench_mode in [BenchMode::Legacy, BenchMode::Fast] {
+            println!("== {} emission ==", bench_mode.name());
+            let Some(first) = timed_build(bench_mode) else {
+                restore(&shader, &original);
+                exit_failed();
+            };
+            println!("  first build (cold if cache empty): {first:.2}s");
 
-        for mode in [Mode::Inside, Mode::Above] {
-            println!("\n{} mode ({}):", mode.name(), mode.description());
-            let mut times = Vec::new();
-            for iteration in 1..=ITERATIONS {
-                let mutated = mutate(&original, mode, iteration);
-                std::fs::write(&shader, mutated)
-                    .expect("could not write the mutated shader source");
-                let Some(t) = timed_build() else {
-                    restore(&shader, &original);
-                    exit_failed();
-                };
-                times.push(t);
-                println!("  iteration {iteration}: {t:.2}s");
+            for mutation_mode in [MutationMode::Inside, MutationMode::Above] {
+                println!(
+                    "  {} mutation mode ({}):",
+                    mutation_mode.name(),
+                    mutation_mode.description()
+                );
+                let mut times = Vec::new();
+                for iteration in 1..=ITERATIONS {
+                    let mutated = mutate(&original, mutation_mode, iteration);
+                    std::fs::write(&shader, mutated)
+                        .expect("could not write the mutated shader source");
+                    let Some(t) = timed_build(bench_mode) else {
+                        restore(&shader, &original);
+                        exit_failed();
+                    };
+                    times.push(t);
+                    println!("    iteration {iteration}: {t:.2}s");
+                }
+                println!("    median incremental: {:.2}s", median(&times));
             }
-            println!("  median incremental: {:.2}s", median(&times));
         }
 
         restore(&shader, &original);
@@ -95,9 +114,29 @@ impl BenchAction {
     }
 }
 
+/// Which macro emission path the bench crate compiles with.
+#[derive(Clone, Copy)]
+enum BenchMode {
+    /// The default-on `fast-compile` feature: static `static_ir` data
+    /// plus a slim conversion shim.
+    Fast,
+    /// `--no-default-features`: the legacy constructor-function
+    /// emission (the rollback off-state).
+    Legacy,
+}
+
+impl BenchMode {
+    fn name(self) -> &'static str {
+        match self {
+            BenchMode::Fast => "fast (static IR data)",
+            BenchMode::Legacy => "legacy (constructor fn)",
+        }
+    }
+}
+
 /// Mutation modes, both from the issue's retrigger list.
 #[derive(Clone, Copy)]
-enum Mode {
+enum MutationMode {
     /// Rewrite a literal inside the `#[wgsl]` mod (macro input changes).
     Inside,
     /// Insert/remove a line above the mod (spans of everything below
@@ -105,26 +144,26 @@ enum Mode {
     Above,
 }
 
-impl Mode {
+impl MutationMode {
     fn name(self) -> &'static str {
         match self {
-            Mode::Inside => "inside",
-            Mode::Above => "above",
+            MutationMode::Inside => "inside",
+            MutationMode::Above => "above",
         }
     }
 
     fn description(self) -> &'static str {
         match self {
-            Mode::Inside => "rewrite a literal inside the #[wgsl] mod",
-            Mode::Above => "insert/remove a comment line at the top of the file",
+            MutationMode::Inside => "rewrite a literal inside the #[wgsl] mod",
+            MutationMode::Above => "insert/remove a comment line at the top of the file",
         }
     }
 }
 
 /// Deterministically mutate the bench shader for one iteration.
-fn mutate(original: &str, mode: Mode, iteration: usize) -> String {
+fn mutate(original: &str, mode: MutationMode, iteration: usize) -> String {
     match mode {
-        Mode::Inside => {
+        MutationMode::Inside => {
             let start = original
                 .find(TICK_CONST)
                 .expect("bench shader is missing the BENCH_TICK anchor const");
@@ -141,7 +180,7 @@ fn mutate(original: &str, mode: Mode, iteration: usize) -> String {
             mutated.replace_range(value_start..value_start + digit_len, &iteration.to_string());
             mutated
         }
-        Mode::Above => {
+        MutationMode::Above => {
             if iteration % 2 == 1 {
                 format!("{SPACER_LINE}\n{original}")
             } else {
@@ -151,11 +190,16 @@ fn mutate(original: &str, mode: Mode, iteration: usize) -> String {
     }
 }
 
-/// Time one isolated `cargo build -p compile-bench` at `opt-level=1`.
-fn timed_build() -> Option<f64> {
+/// Time one isolated `cargo build -p compile-bench` at `opt-level=1`,
+/// in the given emission mode.
+fn timed_build(mode: BenchMode) -> Option<f64> {
     let start = Instant::now();
-    let status = std::process::Command::new("cargo")
-        .args(["build", "-p", "compile-bench"])
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.args(["build", "-p", "compile-bench"]);
+    if matches!(mode, BenchMode::Legacy) {
+        cmd.arg("--no-default-features");
+    }
+    let status = cmd
         .env("CARGO_PROFILE_DEV_OPT_LEVEL", "1")
         .status()
         .expect("could not spawn cargo");

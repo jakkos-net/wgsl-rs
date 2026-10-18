@@ -11,10 +11,17 @@ keywords = ["wgsl", "wgpu", "shader", "gpu"]
 categories = ["graphics", "game-development"]
 
 [features]
-default = ["validation", "dispatch-runtime"]
+default = ["validation", "dispatch-runtime", "fast-compile"]
 serde = ["dep:serde", "half/serde"]
 validation = ["dep:naga", "wgsl-rs-macros/validation"]
 dispatch-runtime = ["dep:rayon"]
+# Emit IR as static `static_ir` data plus a slim conversion shim
+# (wgsl-rs#221). Default-on: opt-in fixes never reach users. Opting
+# out requires `default-features = false` (and re-enabling the
+# wanted default features) across the *whole* build graph, because
+# cargo unifies features: one crate keeping the defaults turns this on
+# for everyone in that graph.
+fast-compile = ["wgsl-rs-macros/fast-compile"]
 
 [dependencies]
 glam.workspace = true

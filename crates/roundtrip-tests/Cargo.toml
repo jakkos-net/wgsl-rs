@@ -9,5 +9,14 @@ bytemuck.workspace = true
 clap.workspace = true
 futures.workspace = true
 wgpu.workspace = true
-wgsl-rs = { path = "../wgsl-rs" }
+# Default features are off so this crate's `fast` feature is the only
+# switch between the two macro emission paths (wgsl-rs#221); run the
+# legacy path with `--no-default-features`. A whole-workspace build
+# unifies features, so legacy runs must use an isolated
+# `-p roundtrip-tests` invocation.
+wgsl-rs = { path = "../wgsl-rs", default-features = false, features = ["validation", "dispatch-runtime"] }
 wgsl-rs-linkage-wgpu = { path = "../wgsl-rs-linkage-wgpu" }
+
+[features]
+default = ["fast"]
+fast = ["wgsl-rs/fast-compile"]
