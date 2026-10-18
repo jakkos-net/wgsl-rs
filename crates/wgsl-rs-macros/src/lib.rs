@@ -470,7 +470,19 @@ fn gen_wgsl_module(
         }
     })?;
 
+    let ir_module = wgsl_rs_ir::Module {
+        name: Box::leak(module_name_ident.to_string().into_boxed_str()),
+        items: ir_items,
+        attrs: wgsl_module.attrs.clone(),
+    };
+
     let module_ctor_ident = quote::format_ident!("__wgsl_module_ctor");
+
+    // The canonical `static_ir` rendering of the module: the emitted
+    // static data under `fast-compile`, and the content-hash input for
+    // the deterministic module id in both emission modes.
+    let module_static_data = ir_emit_static::emit_static_module(&ir_p, &ir_module);
+    let module_descriptor = module_static_data.to_string();
 
     // The module IR constructor and, under `fast-compile`, the static
     // data it reads. `fast-compile` emits the IR as a static literal of
@@ -479,83 +491,82 @@ fn gen_wgsl_module(
     // that builds the IR expression-by-expression, which for a large
     // shader is a ~12,000-line function LLVM spends ~14s on per
     // incremental rebuild at opt-level=1.
-    let (module_ctor, module_statics): (proc_macro2::TokenStream, proc_macro2::TokenStream) =
-        if cfg!(feature = "fast-compile") {
-            let ir_module = wgsl_rs_ir::Module {
-                name: Box::leak(module_name_ident.to_string().into_boxed_str()),
-                items: ir_items,
-                attrs: wgsl_module.attrs.clone(),
-            };
-            let ir_module_static_ident = quote::format_ident!("__WGSL_IR_MODULE");
-            let data = ir_emit_static::emit_static_module(&ir_p, &ir_module);
-            let ctor_body = if extensions.is_empty() {
-                quote! { #ir_p::Module::from(#ir_module_static_ident) }
-            } else {
-                let extension_calls: Vec<proc_macro2::TokenStream> = extensions
-                    .iter()
-                    .map(|ext_path| {
-                        quote! {
-                            <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
-                        }
-                    })
-                    .collect();
-                quote! {
-                    let mut m = #ir_p::Module::from(#ir_module_static_ident);
-                    #(#extension_calls)*
-                    m
-                }
-            };
-            (
-                quote! {
-                    fn #module_ctor_ident() -> #ir_p::Module { #ctor_body }
-                },
-                quote! {
-                    static #ir_module_static_ident: &#ir_p::static_ir::StaticModule = #data;
-                },
-            )
+    let (module_ctor, module_statics): (proc_macro2::TokenStream, proc_macro2::TokenStream) = if cfg!(
+        feature = "fast-compile"
+    ) {
+        let ir_module_static_ident = quote::format_ident!("__WGSL_IR_MODULE");
+        let ctor_body = if extensions.is_empty() {
+            quote! { #ir_p::Module::from(#ir_module_static_ident) }
         } else {
-            let item_exprs: Vec<proc_macro2::TokenStream> = ir_items
+            let extension_calls: Vec<proc_macro2::TokenStream> = extensions
                 .iter()
-                .map(|i| ir_emit::emit_item(&ir_p, i))
+                .map(|ext_path| {
+                    quote! {
+                        <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
+                    }
+                })
                 .collect();
-            let module_attrs = ir_emit::emit_attrs(&ir_p, &wgsl_module.attrs);
-            let module_struct = quote! {
-                #ir_p::Module {
-                    name: stringify!(#module_name_ident),
-                    items: ::std::vec![#(#item_exprs),*],
-                    #module_attrs,
-                }
-            };
-            let ctor_body = if extensions.is_empty() {
-                module_struct
-            } else {
-                let extension_calls: Vec<proc_macro2::TokenStream> = extensions
-                    .iter()
-                    .map(|ext_path| {
-                        quote! {
-                            <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
-                        }
-                    })
-                    .collect();
-                quote! {
-                    let mut m = #module_struct;
-                    #(#extension_calls)*
-                    m
-                }
-            };
-            (
-                quote! {
-                    fn #module_ctor_ident() -> #ir_p::Module { #ctor_body }
-                },
-                quote! {},
-            )
+            quote! {
+                let mut m = #ir_p::Module::from(#ir_module_static_ident);
+                #(#extension_calls)*
+                m
+            }
         };
+        (
+            quote! {
+                fn #module_ctor_ident() -> #ir_p::Module { #ctor_body }
+            },
+            quote! {
+                static #ir_module_static_ident: &#ir_p::static_ir::StaticModule = #module_static_data;
+            },
+        )
+    } else {
+        let item_exprs: Vec<proc_macro2::TokenStream> = ir_module
+            .items
+            .iter()
+            .map(|i| ir_emit::emit_item(&ir_p, i))
+            .collect();
+        let module_attrs = ir_emit::emit_attrs(&ir_p, &wgsl_module.attrs);
+        let module_struct = quote! {
+            #ir_p::Module {
+                name: stringify!(#module_name_ident),
+                items: ::std::vec![#(#item_exprs),*],
+                #module_attrs,
+            }
+        };
+        let ctor_body = if extensions.is_empty() {
+            module_struct
+        } else {
+            let extension_calls: Vec<proc_macro2::TokenStream> = extensions
+                .iter()
+                .map(|ext_path| {
+                    quote! {
+                        <#ext_path as #crate_path::WgslExtension>::modify_ir(&mut m);
+                    }
+                })
+                .collect();
+            quote! {
+                let mut m = #module_struct;
+                #(#extension_calls)*
+                m
+            }
+        };
+        (
+            quote! {
+                fn #module_ctor_ident() -> #ir_p::Module { #ctor_body }
+            },
+            quote! {},
+        )
+    };
 
     // Generate template entries for generic functions / structs defined in
     // this module. The IR is built lazily by an emitted constructor
     // function.
     let mut template_constructors: Vec<proc_macro2::TokenStream> = Vec::new();
     let mut template_statics: Vec<proc_macro2::TokenStream> = Vec::new();
+    // Canonical content descriptors of each template, for the
+    // deterministic module id.
+    let mut template_descriptors: Vec<String> = Vec::new();
     let template_entries: Vec<proc_macro2::TokenStream> = mono_result
         .template_macros
         .iter()
@@ -571,14 +582,39 @@ fn gen_wgsl_module(
                 ir_convert::items_from_parse(&tmpl.items).map_err(|e| WgslGenError::WgslParse {
                     source: e.into_parse(),
                 })?;
+
+            // Canonical `static_ir` rendering of the template: emitted
+            // data under `fast-compile`, content-hash input in both
+            // modes.
+            let tmpl_static_data = ir_emit_static::emit_static_items(&ir_p, &ir_items);
+            template_descriptors.push(format!(
+                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                tmpl.fn_name,
+                tmpl.type_param_names.join("\u{1f}"),
+                tmpl.const_param_names.join("\u{1f}"),
+                tmpl.dependencies
+                    .iter()
+                    .map(|dep| format!(
+                        "{}:{}",
+                        dep.callee,
+                        dep.type_param_mapping
+                            .iter()
+                            .map(|mapping| mapping.to_string())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ))
+                    .collect::<Vec<_>>()
+                    .join("\u{1f}"),
+                tmpl_static_data,
+            ));
+
             let ctor_ident = quote::format_ident!("__wgsl_template_{}_ctor", idx);
             if cfg!(feature = "fast-compile") {
                 // Static IR data plus a slim conversion shim; the legacy
                 // path below builds the `vec![...]` constructor body.
                 let static_ident = quote::format_ident!("__wgsl_template_{}", idx);
-                let data = ir_emit_static::emit_static_items(&ir_p, &ir_items);
                 template_statics.push(quote! {
-                    static #static_ident: &[#ir_p::static_ir::StaticItem] = #data;
+                    static #static_ident: &[#ir_p::static_ir::StaticItem] = #tmpl_static_data;
                 });
                 template_constructors.push(quote! {
                     fn #ctor_ident() -> ::std::vec::Vec<#ir_p::Item> {
@@ -632,6 +668,9 @@ fn gen_wgsl_module(
     // runtime; the mangled identifier-safe names are stored as static
     // string slices for deduplication.
     let mut inst_constructors: Vec<proc_macro2::TokenStream> = Vec::new();
+    // Canonical content descriptors of each cross-module instantiation,
+    // for the deterministic module id.
+    let mut inst_descriptors: Vec<String> = Vec::new();
     let inst_entries: Vec<proc_macro2::TokenStream> = mono_result
         .cross_module_instantiations
         .iter()
@@ -643,6 +682,18 @@ fn gen_wgsl_module(
                 inst.mangled_type_args.iter().map(|s| s.as_str()).collect();
             let mangled_const_args: Vec<&str> =
                 inst.mangled_const_args.iter().map(|s| s.as_str()).collect();
+
+            inst_descriptors.push(format!(
+                "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                inst.import_paths
+                    .iter()
+                    .map(|path| path.to_token_stream().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\u{1f}"),
+                inst.fn_name,
+                inst.mangled_type_args.join("\u{1f}"),
+                inst.mangled_const_args.join("\u{1f}"),
+            ));
 
             // Build IR types for each type argument.
             let ir_args: Vec<wgsl_rs_ir::Type> = inst
@@ -699,7 +750,27 @@ fn gen_wgsl_module(
     let module_type_params_lits: Vec<&str> =
         module_type_params.iter().map(|s| s.as_str()).collect();
 
-    let module_id = module_id::next_module_id();
+    // Deterministic module id (wgsl-rs#221): a stable hash of the
+    // module's full content descriptor — IR rendering, templates,
+    // instantiations, imports, and module type params — mixed with the
+    // consuming unit's identity. Replaces the per-process counter,
+    // which shifted every later module's id whenever sibling `#[wgsl]`
+    // mods were added, removed, or reordered, invalidating builds that
+    // did not change.
+    let mut source_descriptor = module_descriptor;
+    for part in template_descriptors.iter().chain(inst_descriptors.iter()) {
+        source_descriptor.push('\0');
+        source_descriptor.push_str(part);
+    }
+    for import in imports {
+        source_descriptor.push('\0');
+        source_descriptor.push_str(&import.to_string());
+    }
+    for type_param in module_type_params {
+        source_descriptor.push('\0');
+        source_descriptor.push_str(type_param);
+    }
+    let module_id = module_id::deterministic_module_id(&source_descriptor);
 
     Ok(quote! {
         #module_statics

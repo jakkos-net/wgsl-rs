@@ -60,14 +60,17 @@ pub use wgsl_rs_ir as ir;
 /// }
 #[derive(Clone, Debug)]
 pub struct Source {
-    /// Unique identifier for this source, assigned at proc-macro expansion
-    /// time from the consuming compilation unit's identity (Cargo
-    /// package name + version, plus crate/bin target names) and a
-    /// per-unit counter (wgsl-rs#165). Exactly unique within one
-    /// compilation unit; across units separated by a 64-bit hash, so
-    /// collisions are astronomically unlikely but not impossible. Used
-    /// to deduplicate sources during source assembly (diamond import
-    /// graphs, same-named sources from different paths).
+    /// Identifier for this source, assigned at proc-macro expansion
+    /// time from a stable hash of the module's content (its IR
+    /// rendering, name, imports, templates, and instantiations) mixed
+    /// with the consuming compilation unit's identity (Cargo package
+    /// name + version, plus crate/bin target names; wgsl-rs#165,
+    /// wgsl-rs#221). Deterministic across builds: identical module
+    /// source yields the same id, so adding or moving sibling `#[wgsl]`
+    /// mods does not shift it. Distinct content yields distinct ids
+    /// probabilistically (64-bit hash). Identical content is
+    /// interchangeable, so assembly dedup (diamond import graphs,
+    /// same-named sources from different paths) is safe.
     pub id: u64,
 
     /// Name of the source.
