@@ -23,18 +23,30 @@ use quote::{ToTokens, quote};
 use wgsl_rs_ir as ir;
 
 /// Emit a `&StaticModule` literal (with leading `&`) for the given
-/// owned module IR, suitable as the initializer of
+/// module name, items, and attributes, suitable as the initializer of
 /// `static X: &ir::static_ir::StaticModule = ...;`.
-pub fn emit_static_module(ir_path: &TokenStream, m: &ir::Module) -> TokenStream {
+///
+/// Takes the module pieces rather than an owned `ir::Module` so the
+/// macro never has to materialize one: `ir::Module::name` is
+/// `&'static str`, and building that value in the macro would require
+/// leaking the name string into the proc-macro process. The emitted
+/// literal carries the name as a plain string literal, which is
+/// `&'static str` in the consuming crate for free, exactly like the
+/// legacy path's `stringify!(...)`.
+pub fn emit_static_module(
+    ir_path: &TokenStream,
+    name: &str,
+    items: &[ir::Item],
+    attrs: &[ir::Attribute],
+) -> TokenStream {
     let p = ir_path;
-    let name = &m.name;
-    let items = m.items.iter().map(|i| static_item(p, i));
-    let attrs = static_attrs(p, &m.attrs);
+    let items_ts = items.iter().map(|i| static_item(p, i));
+    let attrs_ts = static_attrs(p, attrs);
     quote! {
         &#p::static_ir::StaticModule {
             name: #name,
-            items: &[#(#items),*],
-            attrs: #attrs,
+            items: &[#(#items_ts),*],
+            attrs: #attrs_ts,
         }
     }
 }

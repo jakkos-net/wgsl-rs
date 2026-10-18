@@ -470,18 +470,20 @@ fn gen_wgsl_module(
         }
     })?;
 
-    let ir_module = wgsl_rs_ir::Module {
-        name: Box::leak(module_name_ident.to_string().into_boxed_str()),
-        items: ir_items,
-        attrs: wgsl_module.attrs.clone(),
-    };
-
     let module_ctor_ident = quote::format_ident!("__wgsl_module_ctor");
 
     // The canonical `static_ir` rendering of the module: the emitted
     // static data under `fast-compile`, and the content-hash input for
-    // the deterministic module id in both emission modes.
-    let module_static_data = ir_emit_static::emit_static_module(&ir_p, &ir_module);
+    // the deterministic module id in both emission modes. The pieces
+    // are passed directly instead of assembling an owned `ir::Module`:
+    // its `name` field is `&'static str`, and materializing one here
+    // would mean leaking the name string in the proc-macro process.
+    let module_static_data = ir_emit_static::emit_static_module(
+        &ir_p,
+        &module_name_ident.to_string(),
+        &ir_items,
+        &wgsl_module.attrs,
+    );
     let module_descriptor = module_static_data.to_string();
 
     // The module IR constructor and, under `fast-compile`, the static
@@ -521,8 +523,7 @@ fn gen_wgsl_module(
             },
         )
     } else {
-        let item_exprs: Vec<proc_macro2::TokenStream> = ir_module
-            .items
+        let item_exprs: Vec<proc_macro2::TokenStream> = ir_items
             .iter()
             .map(|i| ir_emit::emit_item(&ir_p, i))
             .collect();
@@ -752,11 +753,11 @@ fn gen_wgsl_module(
 
     // Deterministic module id (wgsl-rs#221): a stable hash of the
     // module's full content descriptor — IR rendering, templates,
-    // instantiations, imports, and module type params — mixed with the
-    // consuming unit's identity. Replaces the per-process counter,
-    // which shifted every later module's id whenever sibling `#[wgsl]`
-    // mods were added, removed, or reordered, invalidating builds that
-    // did not change.
+    // instantiations, imports, module type params, and the
+    // `extensions = [...]` list — mixed with the consuming unit's
+    // identity. Replaces the per-process counter, which shifted every
+    // later module's id whenever sibling `#[wgsl]` mods were added,
+    // removed, or reordered, invalidating builds that did not change.
     let mut source_descriptor = module_descriptor;
     for part in template_descriptors.iter().chain(inst_descriptors.iter()) {
         source_descriptor.push('\0');
@@ -769,6 +770,17 @@ fn gen_wgsl_module(
     for type_param in module_type_params {
         source_descriptor.push('\0');
         source_descriptor.push_str(type_param);
+    }
+    // The extension list changes what `modify_ir` produces from
+    // otherwise identical IR, so it must be part of the id: without it,
+    // two same-named mods differing only in their extension lists
+    // would share an id, and assembly dedup would silently keep one
+    // and drop the other's extensions — where previously both sources
+    // were kept and the duplicate WGSL definitions failed loudly at
+    // validation.
+    for extension in extensions {
+        source_descriptor.push('\0');
+        source_descriptor.push_str(&extension.to_token_stream().to_string());
     }
     let module_id = module_id::deterministic_module_id(&source_descriptor);
 
