@@ -1,6 +1,6 @@
 [package]
 name = "wgsl-rs-linkage-wgpu"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 edition = "2024"
 description = "wgpu linkage generation for wgsl-rs shader modules; defaults to the latest supported wgpu major, with feature-gated modules for older majors."
 license = "MIT"
@@ -27,8 +27,8 @@ snafu.workspace = true
 # default-features = false: this crate's own `validation` feature is
 # the sole forwarding path, so `--no-default-features` builds stay lean
 # (no naga validation, no rayon dispatch runtime).
-wgsl-rs = { version = "0.1.0-beta.5", path = "../wgsl-rs", default-features = false }
-wgsl-rs-ir = { version = "0.1.0-beta.5", path = "../wgsl-rs-ir" }
+wgsl-rs = { version = "0.1.0-beta.6", path = "../wgsl-rs", default-features = false }
+wgsl-rs-ir = { version = "0.1.0-beta.6", path = "../wgsl-rs-ir" }
 # Renamed per-major entries: cargo resolves semver-incompatible majors
 # as distinct graph nodes, so the features above can select between
 # them. Local (non-workspace) pins: the workspace `wgpu` entry tracks
