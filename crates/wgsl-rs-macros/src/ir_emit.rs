@@ -16,20 +16,6 @@ use wgsl_rs_ir as ir;
 
 /// Emit an expression that constructs the given module IR at runtime. The
 /// emitted code references types under `#ir_path` (e.g. `wgsl_rs::ir`).
-#[allow(dead_code)]
-pub fn emit_module(ir_path: &TokenStream, m: &ir::Module) -> TokenStream {
-    let name = &m.name;
-    let items = m.items.iter().map(|i| emit_item(ir_path, i));
-    let attrs = emit_attrs(ir_path, &m.attrs);
-    quote! {
-        #ir_path::Module {
-            name: #name,
-            items: ::std::vec![#(#items),*],
-            #attrs,
-        }
-    }
-}
-
 /// Emit an expression that constructs a `Vec<ir::Item>` at runtime.
 #[allow(dead_code)]
 pub fn emit_items(ir_path: &TokenStream, items: &[ir::Item]) -> TokenStream {

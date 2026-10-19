@@ -23,6 +23,7 @@ proc-macro = true
 bench = false
 
 [dependencies]
+bitcode = { version = "0.6.9", default-features = false, features = ["serde", "std"] }
 itertools.workspace = true
 proc-macro2.workspace = true
 snafu.workspace = true

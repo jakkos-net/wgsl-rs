@@ -13,7 +13,7 @@ use std::borrow::Cow;
 /// vec!["SlabItem", "Clone"] }` E.g., `#[repr(C)]` → `Attribute { path: "repr",
 /// args: vec!["C"] }` E.g., `#[inline]` → `Attribute { path: "inline", args:
 /// vec![] }`
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Attribute {
     /// The attribute path (e.g., "derive", "repr", "crabslab::slab_item").
     pub path: String,
@@ -33,7 +33,7 @@ pub struct Module {
 }
 
 /// A block of statements `{ ... }`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
 }
@@ -41,7 +41,7 @@ pub struct Block {
 // ===== Scalar / address space / texture kinds =====
 
 /// WGSL scalar types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ScalarType {
     I32,
     U32,
@@ -50,7 +50,7 @@ pub enum ScalarType {
 }
 
 /// WGSL address spaces relevant for pointer types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum AddressSpace {
     Function,
     Private,
@@ -58,14 +58,14 @@ pub enum AddressSpace {
 }
 
 /// Storage buffer access mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StorageAccess {
     Read,
     ReadWrite,
 }
 
 /// Sampled texture kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TextureKind {
     Texture1D,
     Texture2D,
@@ -77,7 +77,7 @@ pub enum TextureKind {
 }
 
 /// Depth texture kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TextureDepthKind {
     Depth2D,
     Depth2DArray,
@@ -87,7 +87,7 @@ pub enum TextureDepthKind {
 }
 
 /// Storage texture kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TextureStorageKind {
     Storage1D,
     Storage2D,
@@ -99,7 +99,7 @@ pub enum TextureStorageKind {
 ///
 /// Unlike [`StorageAccess`] (used for storage buffers, which only allow
 /// `read` and `read_write`), storage textures also support `write`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StorageTextureAccess {
     Read,
     Write,
@@ -111,7 +111,7 @@ pub enum StorageTextureAccess {
 /// Each variant maps 1:1 to a `wgpu::TextureFormat` of the same name. The
 /// `requires_tier1` method reports whether the `texture_formats_tier1`
 /// language extension must be enabled to use the format.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TexelFormat {
     // ===== Core formats (no extension required) =====
     Rgba8unorm,
@@ -370,7 +370,7 @@ impl TextureStorageKind {
 // ===== Type =====
 
 /// WGSL type expression.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Type {
     /// A scalar type such as `i32`, `u32`, `f32`, `bool`.
     Scalar(ScalarType),
@@ -462,7 +462,7 @@ impl core::fmt::Display for Type {
 // ===== Literals / operators =====
 
 /// A literal value.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Lit {
     Bool(bool),
     /// An integer literal, with the original text and an optional Rust-style
@@ -480,7 +480,7 @@ pub enum Lit {
 }
 
 /// Binary operators.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum BinOp {
     Add,
     Sub,
@@ -503,7 +503,7 @@ pub enum BinOp {
 }
 
 /// Compound assignment operators.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CompoundOp {
     AddAssign,
     SubAssign,
@@ -518,7 +518,7 @@ pub enum CompoundOp {
 }
 
 /// Unary operators.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum UnOp {
     /// Logical not (`!` in WGSL and Rust). Applies to `bool` (and
     /// `vecN<bool>` in WGSL) only.
@@ -536,21 +536,21 @@ pub enum UnOp {
 
 /// A function call path: either a free function name or a `Type::method`
 /// path (which is mangled to `Type_method` at render time).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FnPath {
     Ident(String),
     TypeMethod { ty: String, method: String },
 }
 
 /// A struct expression field: `name: expr` or shorthand `name`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldValue {
     pub member: String,
     pub expr: Expr,
 }
 
 /// An expression.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Expr {
     Lit(Lit),
     Ident(String),
@@ -618,7 +618,7 @@ pub enum Expr {
 // ===== Statements =====
 
 /// A `let` / `var` / `const` initializer.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Local {
     /// `true` when this should render as `var` (Rust `let mut`, or
     /// uninitialized `let` — WGSL `let` requires an initializer);
@@ -630,7 +630,7 @@ pub struct Local {
 }
 
 /// A `for` loop lowered from a Rust `for i in from..to` (or `..=to`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ForLoop {
     pub var: String,
     pub var_ty: Option<Type>,
@@ -642,7 +642,7 @@ pub struct ForLoop {
 }
 
 /// An `if` statement, possibly with an `else` branch.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StmtIf {
     pub condition: Expr,
     pub then_block: Block,
@@ -650,14 +650,14 @@ pub struct StmtIf {
 }
 
 /// An `else` branch.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ElseBranch {
     Block(Block),
     If(Box<StmtIf>),
 }
 
 /// A `match` / `switch` statement.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StmtSwitch {
     pub selector: Expr,
     pub arms: Vec<SwitchArm>,
@@ -666,14 +666,14 @@ pub struct StmtSwitch {
 }
 
 /// One arm of a switch / match.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SwitchArm {
     pub selectors: Vec<CaseSelector>,
     pub body: Block,
 }
 
 /// A case selector for a switch arm.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CaseSelector {
     Literal(Lit),
     Expr(Expr),
@@ -681,7 +681,7 @@ pub enum CaseSelector {
 }
 
 /// A statement.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Stmt {
     /// A `let` / `var` / `const` initializer.
     Local(Local),
@@ -759,7 +759,7 @@ pub enum Stmt {
 // ===== Function attrs / args / return =====
 
 /// Workgroup size for a `@compute` shader.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct WorkgroupSize {
     pub x: u32,
     pub y: Option<u32>,
@@ -767,7 +767,7 @@ pub struct WorkgroupSize {
 }
 
 /// Function-level attributes (entry point markers).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FnAttrs {
     None,
     Vertex,
@@ -776,7 +776,7 @@ pub enum FnAttrs {
 }
 
 /// A WGSL builtin attribute name (used inside `@builtin(...)`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum BuiltIn {
     VertexIndex,
     InstanceIndex,
@@ -798,7 +798,7 @@ pub enum BuiltIn {
 }
 
 /// `@interpolate(...)` interpolation type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum InterpolationType {
     Perspective,
     Linear,
@@ -806,7 +806,7 @@ pub enum InterpolationType {
 }
 
 /// `@interpolate(_, sampling)` sampling.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum InterpolationSampling {
     Center,
     Centroid,
@@ -816,14 +816,14 @@ pub enum InterpolationSampling {
 }
 
 /// Body of an `@interpolate` attribute.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Interpolate {
     pub ty: InterpolationType,
     pub sampling: Option<InterpolationSampling>,
 }
 
 /// An inter-stage IO attribute on a function argument or struct field.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum InterStageIo {
     BuiltIn(BuiltIn),
     Location(u32),
@@ -833,7 +833,7 @@ pub enum InterStageIo {
 }
 
 /// A return type annotation: `@builtin(position)`, `@location(0)`, etc.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ReturnTypeAnnotation {
     None,
     BuiltIn(BuiltIn),
@@ -843,7 +843,7 @@ pub enum ReturnTypeAnnotation {
 }
 
 /// Return type of a function.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ReturnType {
     Default,
     Type {
@@ -853,7 +853,7 @@ pub enum ReturnType {
 }
 
 /// A function argument.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FnArg {
     pub inter_stage_io: Vec<InterStageIo>,
     pub name: String,
@@ -865,7 +865,7 @@ pub struct FnArg {
 // ===== Items =====
 
 /// A `const` item.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemConst {
     pub name: String,
     pub ty: Type,
@@ -875,7 +875,7 @@ pub struct ItemConst {
 }
 
 /// A `@group(N) @binding(M) var<uniform>` linkage.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemUniform {
     pub group: u32,
     pub binding: u32,
@@ -886,7 +886,7 @@ pub struct ItemUniform {
 }
 
 /// A `@group(N) @binding(M) var<storage, ...>` linkage.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemStorage {
     pub group: u32,
     pub binding: u32,
@@ -898,7 +898,7 @@ pub struct ItemStorage {
 }
 
 /// A `var<workgroup>` declaration.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemWorkgroup {
     pub name: String,
     pub ty: Type,
@@ -907,7 +907,7 @@ pub struct ItemWorkgroup {
 }
 
 /// A `@group(N) @binding(M) var ... : sampler[_comparison]` linkage.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemSampler {
     pub group: u32,
     pub binding: u32,
@@ -927,7 +927,7 @@ pub struct ItemSampler {
 }
 
 /// A `@group(N) @binding(M) var ... : texture_*` linkage.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemTexture {
     pub group: u32,
     pub binding: u32,
@@ -945,7 +945,7 @@ pub struct ItemTexture {
 }
 
 /// A function definition.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemFn {
     /// Type parameters declared on the function. After monomorphization
     /// these are usually empty; non-empty values appear only on generic
@@ -975,7 +975,7 @@ pub struct ItemFn {
 }
 
 /// A struct field.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Field {
     pub inter_stage_io: Vec<InterStageIo>,
     pub name: String,
@@ -985,7 +985,7 @@ pub struct Field {
 }
 
 /// A struct definition.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemStruct {
     pub type_params: Vec<String>,
     /// `const` parameters declared on the struct (e.g. `["N"]` for
@@ -998,7 +998,7 @@ pub struct ItemStruct {
 }
 
 /// An item inside an `impl` block.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ImplItem {
     Fn(ItemFn),
     Const(ItemConst),
@@ -1008,7 +1008,7 @@ pub enum ImplItem {
 }
 
 /// An associated type alias defined in an impl block.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemTypeAlias {
     pub name: String,
     pub ty: Type,
@@ -1016,7 +1016,7 @@ pub struct ItemTypeAlias {
 
 /// An `impl` block. Methods and associated constants are name-mangled to
 /// `StructName_member` at render time.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemImpl {
     pub type_params: Vec<String>,
     /// `const` parameters declared on the impl block.
@@ -1028,7 +1028,7 @@ pub struct ItemImpl {
 }
 
 /// One variant of an enum.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EnumVariant {
     pub name: String,
     /// Optional explicit discriminant value. When `None`, the renderer
@@ -1037,7 +1037,7 @@ pub struct EnumVariant {
 }
 
 /// An enum definition. Renders as a `u32` alias plus per-variant `const`s.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemEnum {
     pub name: String,
     pub variants: Vec<EnumVariant>,
@@ -1046,7 +1046,7 @@ pub struct ItemEnum {
 }
 
 /// A top-level WGSL module item.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Item {
     Const(ItemConst),
     Uniform(ItemUniform),
@@ -1061,6 +1061,14 @@ pub enum Item {
 }
 
 impl Module {
+    /// Decodes the IR payload emitted by the proc-macro.
+    #[doc(hidden)]
+    #[inline(never)]
+    pub fn decode(name: &'static str, encoded: &[u8]) -> Self {
+        let (items, attrs) = bitcode::deserialize(encoded).unwrap();
+        Self { name, items, attrs }
+    }
+
     /// Renders this IR module to its WGSL source text.
     ///
     /// Rendering first applies the type-directed literal suffix pass

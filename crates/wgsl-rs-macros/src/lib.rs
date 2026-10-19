@@ -469,17 +469,10 @@ fn gen_wgsl_module(
         }
     })?;
     let module_constructor_body = {
-        let item_exprs: Vec<proc_macro2::TokenStream> = ir_items
-            .iter()
-            .map(|i| ir_emit::emit_item(&ir_p, i))
-            .collect();
-        let module_attrs = ir_emit::emit_attrs(&ir_p, &wgsl_module.attrs);
+        let encoded = bitcode::serialize(&(&ir_items, &wgsl_module.attrs)).unwrap();
+        let encoded = syn::LitByteStr::new(&encoded, name.span());
         let module_struct = quote! {
-            #ir_p::Module {
-                name: stringify!(#module_name_ident),
-                items: ::std::vec![#(#item_exprs),*],
-                #module_attrs,
-            }
+            #ir_p::Module::decode(stringify!(#module_name_ident), #encoded)
         };
         if extensions.is_empty() {
             module_struct

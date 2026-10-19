@@ -193,6 +193,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b71798fca2c1fe1086445a7258a4bc81e6e49dcd24c8d0dd9a1e57395b603f51"
 
 [[package]]
+name = "bitcode"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a6ed1b54d8dc333e7be604d00fa9262f4635485ffea923647b6521a5fff045d"
+dependencies = [
+ "arrayvec",
+ "bytemuck",
+ "glam",
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3787,6 +3799,10 @@ dependencies = [
 [[package]]
 name = "wgsl-rs-ir"
 version = "0.1.0-beta.2"
+dependencies = [
+ "bitcode",
+ "serde",
+]
 
 [[package]]
 name = "wgsl-rs-layout"
@@ -3810,6 +3826,7 @@ dependencies = [
 name = "wgsl-rs-macros"
 version = "0.1.0-beta.2"
 dependencies = [
+ "bitcode",
  "itertools",
  "proc-macro2",
  "quote",
