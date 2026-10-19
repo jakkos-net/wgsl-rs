@@ -4042,7 +4042,7 @@ dependencies = [
 
 [[package]]
 name = "wgsl-rs"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 dependencies = [
  "futures",
  "glam",
@@ -4060,11 +4060,11 @@ dependencies = [
 
 [[package]]
 name = "wgsl-rs-ir"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 
 [[package]]
 name = "wgsl-rs-layout"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 dependencies = [
  "snafu",
  "wgsl-rs",
@@ -4073,7 +4073,7 @@ dependencies = [
 
 [[package]]
 name = "wgsl-rs-layout-macros"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4082,7 +4082,7 @@ dependencies = [
 
 [[package]]
 name = "wgsl-rs-linkage-wgpu"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 dependencies = [
  "futures",
  "snafu",
@@ -4094,7 +4094,7 @@ dependencies = [
 
 [[package]]
 name = "wgsl-rs-macros"
-version = "0.1.0-beta.5"
+version = "0.1.0-beta.6"
 dependencies = [
  "itertools",
  "proc-macro2",
